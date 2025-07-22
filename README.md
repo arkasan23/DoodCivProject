@@ -1,1 +1,4 @@
 # DoodProject
+
+Idea:
+
