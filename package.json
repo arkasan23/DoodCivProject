@@ -2,5 +2,10 @@
     "dependencies": {
         "express": "5.1.0",
         "phaser": "^3.90.0"
+    },
+    
+    "scripts": {
+        "start": "cd app && node server.js",
+        "setup": "psql -U postgres -f setup.sql"
     }
 }
