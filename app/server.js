@@ -1,10 +1,26 @@
+const pg = require("pg");
 const express = require("express");
 const app = express();
-
 const port = 3000;
 const hostname = "localhost";
+const env = require("../env.json");
+// const env = require("../env_sample.json");
+const Pool = pg.Pool;
+const pool = new Pool(env);
+pool.connect().then(function () {
+  console.log(`Connected to database ${env.database}`);
+});
+
 
 app.use(express.static("public"));
+
+app.get("/get_unit", async (req, res) => {
+
+
+})
+
+
+
 
 
 app.listen(port, hostname, () => {

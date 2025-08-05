@@ -1,11 +1,12 @@
 {
     "dependencies": {
         "express": "5.1.0",
+        "pg": "^8.16.3",
         "phaser": "^3.90.0"
     },
-    
     "scripts": {
         "start": "cd app && node server.js",
-        "setup": "psql -U postgres -f setup.sql"
+        "setup": "psql -U postgres -f setup.sql",
+        "insert": "cd app && node insertEntity.js"
     }
 }
