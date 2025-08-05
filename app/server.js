@@ -14,7 +14,8 @@ pool.connect().then(function () {
 
 app.use(express.static("public"));
 
-app.get("/get_unit", async (req, res) => {
+
+app.get("/get_unit?", async (req, res) => {
 
 
 })

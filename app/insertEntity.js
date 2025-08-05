@@ -2,10 +2,6 @@ let { Pool } = require("pg");
 let env = require("../env.json");
 let pool = new Pool(env);
 
-// "DROP TABLE units_data;"
-// "DROP TABLE structures_data;"
-
-
 let table_data = {
     "units_data": [
         [0, "scout", 50, 0, 3, 0, 50],
@@ -32,11 +28,12 @@ let table_data = {
 
 async function insert_data() {
     try {
+        // Truncate table to prevent duplication errors
         await pool.query("TRUNCATE TABLE units_data");
         await pool.query("TRUNCATE TABLE structures_data");
 
         let unit_command = "INSERT INTO units_data(id, name, health, damage, move_range, attack_range, cost) VALUES($1, $2, $3, $4, $5, $6, $7)";
-        let struct_command = "INSERT INTO structures_data (id, name, health, cost) VALUES($1, $2, $3, $4)";
+        let struct_command = "INSERT INTO structures_data(id, name, health, cost) VALUES($1, $2, $3, $4)";
 
 
         for (const data of table_data.units_data) {
