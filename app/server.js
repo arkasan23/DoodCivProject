@@ -22,7 +22,24 @@ app.get("/get_unit", async (req, res) => {
     res.json(unit);
   } catch (error) {
     console.error(error);
-    res.status(500).send("Something went wrong.");
+    res.status(500).send("Error getting unit.");
+  }
+});
+
+app.get("/initiate_unit", (req, res) => {
+  try {
+    const unitName = req.query.unitName;
+    const mapPos = req.query.mapPos;
+    const player = req.query.player;
+    fetch(`http://localhost:3000/get_unit?unitName=${unitName}`)
+    .then(async (response) => {
+      const unit = await response.json();
+      await selectEntity.initiateUnit(unit, mapPos, player);
+      res.send();
+    })
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error initiating unit.");
   }
 });
 
