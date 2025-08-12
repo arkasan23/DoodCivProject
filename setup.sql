@@ -7,7 +7,8 @@ CREATE TABLE units_data (
 	damage integer,
 	move_range integer,
 	attack_range integer,
-	cost integer
+	cost integer,
+	upgradeable boolean
 );
 
 CREATE TABLE units_state (
@@ -16,6 +17,8 @@ CREATE TABLE units_state (
     current_health integer,
 	map_pos integer, --tile #
 	owned_by integer --players id
+	can_move boolean --dictates if the unit has moved or not
+					 --Ex: when a unit attacks, they shouldn't move anymore
 );
 
 CREATE TABLE players (
