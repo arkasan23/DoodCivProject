@@ -1,11 +1,17 @@
 let { Pool } = require("pg");
-let env = require("../../env.json");
+let env = require("../env.json");
 let pool = new Pool(env);
 
 class SelectEntity {
     constructor(pool) {
         this.pool = pool;
 
+    }
+
+    async getAllUnits() {
+        let command = `SELECT * FROM units_data`;
+        const allUnits = await pool.query(command);
+        return allUnits.rows;
     }
     
     // Retrieves units from the units_data table
@@ -15,19 +21,17 @@ class SelectEntity {
     async getNewUnit(unitName) {
         // Example use: select * from units_data where name='scout';
         let command = `SELECT * FROM units_data WHERE name = $1`;
-        let unit = await pool.query(command, [unitName]);
+        let unit = await this.pool.query(command, [unitName]);
         return unit.rows[0];
     }
-
-        // TODO: UPDATE THIS TO HAVE q_pos, r_pos
 
     // Inserts the a new unit into the units_state table
     // Should be called when a new unit is bought
     // unit: A JSON containing: id, unit_type, current_health
     // pos: the position the unit will be on
-    async initiateUnit(unit, pos, player) {
-        let command = `INSERT INTO units_state(unit_type, current_health, map_pos, owned_by) VALUES($1, $2, $3, $4)`;
-        await pool.query(command, [unit.unit_type, unit.current_health, pos, player]);
+    async initiateUnit(unit, q_pos, r_pos, player) {
+        let command = `INSERT INTO units_state(unit_type, current_health,owned_by, q_pos, r_pos, can_move) VALUES($1, $2, $3, $4, $5)`;
+        await this.pool.query(command, [unit.unit_type, unit.current_health, player, q_pos, r_pos, can_move]);
     }
 
     // renamed putUnit and changed it since the below function was identical 
@@ -42,66 +46,70 @@ class SelectEntity {
     // gets the unit on the board using the id of that unit
     async getUnitState(id) {
         let command = `SELECT * FROM units_state WHERE id = $1`;
-        let unit = await pool.query(command, id);
-        return unit;
+        let unit = await this.pool.query(command, [id]);
+        return unit.rows[0];
+    }
+
+    // gets the unit's name/type from the units_state table
+    async getUnitType(id) {
+        let command = `SELECT unit_type FROM units_state WHERE id = $1`;
+        let name = await this.pool.query(command, [id]);
+        return name.rows[0];
     }
 
     // gets the unit on the board using the name of that unit
     // from units_state
     async getUnitRange(name) {
         let command = `SELECT attack_range FROM units_data WHERE name = $1`;
-        let range = await pool.query(command, name);
+        let range = await this.pool.query(command, [name]);
         return range;
     }
 
     // from units_data
     async getUnitDamage(name) {
         let command = `SELECT damage FROM units_data WHERE name = $1`;
-        let damage = await pool.query(command, name);
+        let damage = await this.pool.query(command, [name]);
         return damage;
     }
     
     // from units_state
     async getUnitHealth(id) {
         let command = `SELECT current_health FROM units_state WHERE id = $1`;
-        let health = await pool.query(command, id);
-        return health;
+        let health = await this.pool.query(command, [id]);
+        return health.rows[0];
     }
 
     // Updates unit health in units_state
     // Should be called when unit takes damage
     async updateUnitHealth(id, health) {
         let command = `UPDATE units_state SET current_health = $1 WHERE id = $2`;
-        await pool.query(command, health, id);
+        await this.pool.query(command, [health, id]);
     }
 
-        // TODO: UPDATE THIS TO HAVE q_pos, r_pos
     async getUnitPosition(id) {
-        let command = `SELECT map_pos FROM units_state WHERE id = $1`;
-        let pos = await pool.query(command, id);
-        return pos;
+        let command = `SELECT q_pos, r_pos FROM units_state WHERE id = $1`;
+        let pos = await this.pool.query(command, [id]);
+        return pos; // check if this requires .row
     }
 
-        // TODO: UPDATE THIS TO HAVE q_pos, r_pos
-    async getUnitMovement() {
+    async getUnitMovement(id) {
         let command = `SELECT move_range FROM units_data WHERE name = $1`;
-        let pos = await pool.query(command, id);
-        return pos;
+        let movement = await this.pool.query(command, [id]);
+        return movement;
     }
 
-    // TODO: UPDATE THIS TO HAVE q_pos, r_pos
     // Updates unit map position in units_state
     // Should be called when unit moves
-    async updateUnitPos(id, pos) {
-        let command = `UPDATE units_state SET map_pos = $1 WHERE id = $2`;
-        await pool.query(command, pos, id);
+    async updateUnitPos(id, q_pos, r_pos) {
+        let command = `UPDATE units_state SET q_pos = $1, r_pos = $2 WHERE id = $3`;
+        await pool.query(command, [q_pos, r_pos, id]);
     }
 
     // id: id of the unit
     // move: bool that represents if the unit can move or not 
     async updateUnitMove(id, move) {
         let command = `UPDATE units_state SET can_move = $1 WHERE id = $2`;
-        await pool.query(command, move, id)
+        await this.pool.query(command, [move, id])
     }
 
     // Deletes the unit from the units_state table
@@ -109,7 +117,7 @@ class SelectEntity {
     // unit: A JSON containing: id, unit_type, current_health, map_pos, owned_by
     async removeUnit(unit) {
         let command = `DELETE FROM units_state WHERE id = $1`;
-        await pool.query(command, unit.id);
+        await this.pool.query(command, [unit.id]);
     }
 
     // Retrieves structures from the structures_data table
@@ -118,7 +126,7 @@ class SelectEntity {
     // Returns the structure retrieved
     async getNewStruct(structName) {
         let command = `SELECT name FROM structures_data WHERE name = $1`;
-        let struct = await pool.query(command, structName)
+        let struct = await this.pool.query(command, [structName])
         return struct;
     }
 
@@ -127,12 +135,12 @@ class SelectEntity {
     // struct: A JSON containing: id, structure_type, current_health, map_pos, owned_by
     async putStruct(struct) {
         let command = `INSERT INTO structures_state(id, structure_type, current_health, map_pos, owned_by) VALUES($1, $2, $3, $4, $5)`;
-        await pool.query(command, struct.id, struct.structure_type, struct.current_health, struct.map_pos, struct.owned_by); 
+        await this.pool.query(command, [struct.id, struct.structure_type, struct.current_health, struct.map_pos, struct.owned_by]); 
     }
 
     async selectStructState(id) {
         let command = `SELECT * FROM structures_state WHERE id = $1`;
-        let struct = await pool.query(command, id)
+        let struct = await this.pool.query(command, [id])
         return struct;
     }
 
@@ -141,7 +149,7 @@ class SelectEntity {
     // unit: A JSON containing: id, structure_type, current_health, map_pos, owned_by
     async removeUnit(struct) {
         let command = `DELETE FROM structures_state WHERE id = $1`;
-        await pool.query(command, struct.id);
+        await pool.query(command, [struct.id]);
     }
 
 
