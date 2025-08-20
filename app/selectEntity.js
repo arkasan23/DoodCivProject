@@ -9,7 +9,7 @@ class SelectEntity {
     }
 
     async getAllUnits() {
-        let command = `SELECT * FROM units_data`;
+        let command = `SELECT * FROM units_state`;
         const allUnits = await pool.query(command);
         return allUnits.rows;
     }
