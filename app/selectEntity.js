@@ -25,7 +25,7 @@ class SelectEntity {
         return unit.rows[0];
     }
 
-    // Inserts the new unit into the units_state table
+    // Inserts the a new unit into the units_state table
     // Should be called when a new unit is bought
     // unit: A JSON containing: id, unit_type, current_health
     // pos: the position the unit will be on
