@@ -129,13 +129,35 @@ app.get("/clear_table", async (req, res) => {
   try {
     const name = req.query.name;
     await pool.query(`TRUNCATE TABLE ${name} RESTART IDENTITY`);
-    res.send();
+    return res.send();
   } catch (error) {
     console.error(error);
-    res.status(500).send(`Error clearing table.`);
+    return res.status(500).send(`Error clearing table.`);
   }
 });
 
+app.get("/get_gold", async (req, res) => {
+  try {
+    const player = req.query.player;
+    const result = await pool.query("SELECT gold FROM players WHERE name = $1", [player]);
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send("Error getting gold.");
+  }
+});
+
+app.put("/set_gold", async (req, res) => {
+  try {
+    const { name, gold } = req.body;
+    await pool.query("UPDATE players SET gold = $1 WHERE name = $2", [gold, name]);
+    res.send();
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send("Error setting gold.");
+  }
+  
+});
 
 app.listen(port, hostname, () => {
   console.log(`Listening at: http://${hostname}:${port}`);
