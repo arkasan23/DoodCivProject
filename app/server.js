@@ -15,6 +15,7 @@ const Combat = require('./public/combat');
 const combat = new Combat(pool);
 
 app.use(express.static("public"));
+app.use(express.json());
 
 // Returns all units from units_state
 app.get("/get_all_units", async (req, res) => {
@@ -49,7 +50,7 @@ app.get("/get_unit_state", async (req, res) => {
     res.json(unit);
   } catch (error) {
     console.error(error);
-    res.status(500).send("Error getting unit.");
+    res.status(500).send("Error getting unit state.");
   }
 });
 
@@ -114,6 +115,25 @@ app.get("/combat", async (req, res) => {
     res.status(500).send("Error in combat.");
   }
 
+});
+
+// adds player to players table
+app.post("/add_player", async (req, res) => {
+  const { player } = req.body;
+  await pool.query("INSERT INTO players (name) VALUES ($1)", [player]);
+  res.send();
+});
+
+// clear given table
+app.get("/clear_table", async (req, res) => {
+  try {
+    const name = req.query.name;
+    await pool.query(`TRUNCATE TABLE ${name} RESTART IDENTITY`);
+    res.send();
+  } catch (error) {
+    console.error(error);
+    res.status(500).send(`Error clearing table.`);
+  }
 });
 
 
