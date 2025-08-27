@@ -5,7 +5,7 @@
 import UnitTray from "./lib/unitTray.js";
 import Unit from "./lib/unit.js";
 
-export default class UnitProgression {
+export default class unitProgression { 
   /**
    * @param {Phaser.Scene} scene
    * @param {Object} opts
