@@ -5,7 +5,7 @@
 import UnitTray from "./lib/unitTray.js";
 import Unit from "./lib/unit.js";
 
-export default class unitProgression { 
+export default class unitProgression {
   /**
    * @param {Phaser.Scene} scene
    * @param {Object} opts
@@ -147,11 +147,12 @@ export default class unitProgression {
     for (const u of this.units) {
       const row = this.scene.add.container(0, y);
 
+      //
       const tray = new UnitTray(
         this.scene,
         36,
-        30,
-        u.iconKey,
+        30, // offset so it sits in row
+        u.iconKey, // texture
         "Player 1",
         Unit,
         u.id,
@@ -160,7 +161,7 @@ export default class unitProgression {
       const label = this.scene.add.text(
         left + 48,
         12,
-        `${u.name} (T${u.tier})`, // initial, no cost yet
+        `${u.name}  (T${u.tier})`,
         {
           fontFamily: '"JetBrains Mono", monospace',
           fontSize: "16px",
@@ -168,7 +169,6 @@ export default class unitProgression {
         },
       );
 
-      // let tray update label when cost loads
       tray.onCostLoaded = (cost) => {
         label.setText(`${u.name} (T${u.tier}) ${cost}g`);
       };
