@@ -402,9 +402,7 @@ export class GameScene extends Phaser.Scene {
         this.playerGold = data.gold;
       });
 
-    this.turnText.setText(
-      `Round: ${this.round}\nCurrent: ${current}\nNext: ${next}`,
-    );
+    this.turnText.setText(`Round: ${this.round}`);
     // this.goldText.setText(`Gold: ${this.playerGold}`);
   }
 

@@ -147,12 +147,11 @@ export default class UnitProgression {
     for (const u of this.units) {
       const row = this.scene.add.container(0, y);
 
-      //
       const tray = new UnitTray(
         this.scene,
         36,
-        30, // offset so it sits in row
-        u.iconKey, // texture
+        30,
+        u.iconKey,
         "Player 1",
         Unit,
         u.id,
@@ -161,13 +160,18 @@ export default class UnitProgression {
       const label = this.scene.add.text(
         left + 48,
         12,
-        `${u.name}  (T${u.tier})`,
+        `${u.name} (T${u.tier})`, // initial, no cost yet
         {
           fontFamily: '"JetBrains Mono", monospace',
           fontSize: "16px",
           color: "#ffffff",
         },
       );
+
+      // let tray update label when cost loads
+      tray.onCostLoaded = (cost) => {
+        label.setText(`${u.name} (T${u.tier}) ${cost}g`);
+      };
 
       const lockOverlay = this.scene.add
         .rectangle(0, 0, this.panelWidth, rowH, 0x000000, 0.45)

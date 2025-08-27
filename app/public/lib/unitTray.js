@@ -13,6 +13,9 @@ export default class UnitTray {
     this.sprite.startX = x;
     this.sprite.startY = y;
 
+    this.sprite.originalX = null;
+    this.sprite.originalY = null;
+
     this.ownerIndex = ownerIndex;
     this.UnitClass = UnitClass;
     this.textureKey = textureKey;
@@ -36,6 +39,10 @@ export default class UnitTray {
       );
       const data = await response.json();
       this.cost = data.cost;
+
+      if (this.onCostLoaded) {
+        this.onCostLoaded(this.cost);
+      }
     } catch (err) {
       console.error("Failed to fetch unit cost:", err);
     }
@@ -64,7 +71,6 @@ export default class UnitTray {
 
       this.sprite.setDepth(2000);
       this.highlightValidTiles();
-      this.sprite.setOrigin(0.5);
     });
 
     this.sprite.on("drag", (pointer, dragX, dragY) => {
@@ -72,15 +78,20 @@ export default class UnitTray {
 
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
-      this.sprite.setOrigin(0.5);
+
+      this.sprite.setDepth(2000);
+
+      const parentWorldY = this.sprite.parentContainer
+        ? this.sprite.parentContainer.y
+        : 0;
 
       const nearestTile = this.getNearestValidTile(worldX, worldY);
       if (nearestTile) {
         this.sprite.x = nearestTile.x;
-        this.sprite.y = nearestTile.y;
+        this.sprite.y = nearestTile.y - (parentWorldY + 40);
       } else {
-        this.sprite.x = worldX;
-        this.sprite.y = worldY;
+        this.sprite.x = dragX;
+        this.sprite.y = dragY;
       }
     });
 
@@ -151,7 +162,6 @@ export default class UnitTray {
   getNearestValidTile(x, y) {
     if (!this.validTiles || this.validTiles.length === 0) return null;
 
-    console.log("nerarest tile!");
     let nearest = null;
     let minDist = Infinity;
 
