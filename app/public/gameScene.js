@@ -71,8 +71,9 @@ export class GameScene extends Phaser.Scene {
   async create() {
     const levelData = this.cache.json.get(this.level);
 
-    // Reset players table
+    // Reset players and units_state table
     await fetch("http://localhost:3000/clear_table?name=players");
+    await fetch("http://localhost:3000/clear_table?name=units_state")
 
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
       const aiName = "AI " + i;
@@ -499,5 +500,41 @@ export class GameScene extends Phaser.Scene {
     } catch (error) {
       console.error("Error, combat request failed:", error);
     }
+  }
+
+  // get level from this.level (set in init(data))
+  // table: name of table (string)
+  saveTable(level, table) {
+    fetch(`http://localhost:3000/export_table`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level, table })
+    })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        console.log(`Table saved successfully: ${result.url}`);
+      } else {
+        console.error("Failed to save table:", result.error);
+      }
+    })
+    .catch(err => console.error("Error saving table:", err));
+  }
+
+  importTable(level, table) {
+    fetch("http://localhost:3000/import_table", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level, table })
+    })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        console.log(result.message);
+      } else {
+        console.error(result.error);
+      }
+    })
+    .catch(err => console.error("Failed to import table:", err));
   }
 }

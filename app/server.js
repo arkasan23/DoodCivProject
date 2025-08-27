@@ -6,6 +6,10 @@ const hostname = "localhost";
 const env = require("../env.json");
 const Pool = pg.Pool;
 const pool = new Pool(env);
+const fs = require("fs");
+const path = require("path");
+const { Parser } = require("json2csv");
+const { parse } = require("csv-parse/sync");
 pool.connect().then(function () {
   console.log(`Connected to database ${env.database}`);
 });
@@ -56,19 +60,16 @@ app.get("/get_unit_state", async (req, res) => {
 
 // for when a new unit is bought
 // TODO: check this 
-app.get("/initiate_unit", (req, res) => {
+app.get("/initiate_unit", async (req, res) => {
   try {
     const unitName = req.query.unitName;
-    fetch(`http://localhost:3000/get_unit?unitName=${unitName}`)
-    const q_pos = req.query.q_pos;
-    const r_pos = req.query.r_pos;
-    const player = req.query.player;
-    this.then(async (response) => {
-      const unit = await response.json();
-      await selectEntity.initiateUnit(unit.name, unit.health, player, q_pos, r_pos, true);
-      // console.log(id);
-      res.send();
-    })
+    const q_pos = parseInt(req.query.q_pos);
+    const r_pos = parseInt(req.query.r_pos);
+    const player = decodeURIComponent(req.query.player);
+    const response = await fetch(`http://localhost:3000/get_unit?unitName=${unitName}`);
+    const unit = await response.json();
+    await selectEntity.initiateUnit(unit, q_pos, r_pos, player);
+    res.send();
   } catch (error) {
     console.error(error);
     res.status(500).send("Error initiating unit.");
@@ -156,7 +157,66 @@ app.put("/set_gold", async (req, res) => {
     console.log(error);
     return res.status(500).send("Error setting gold.");
   }
-  
+});
+
+app.post("/export_table", async (req, res) => {
+  const { table, level } = req.body;
+
+  try {
+    // Query DB for all rows in the table
+    const result = await pool.query(`SELECT * FROM ${table}`);
+
+    // Create folder if it doesn't exist
+    const dir = path.join(__dirname, "public", "saves", level);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    // CSV file path
+    const filePath = path.join(dir, `${table}.csv`);
+
+    // Convert DB rows to CSV
+    const parser = new Parser();
+    const csv = parser.parse(result.rows);
+
+    fs.writeFileSync(filePath, csv);
+
+    // Return URL for browser download
+    res.json({ success: true, url: `/saves/${level}/${table}.csv` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save table" });
+  }
+});
+
+app.post("/import_table", async (req, res) => {
+  const { table, level } = req.body;
+
+  try {
+    const filePath = path.join(__dirname, "public", "saves", level, `${table}.csv`);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "CSV file not found" });
+    }
+
+    const csvContent = fs.readFileSync(filePath, "utf8");
+    const rows = parse(csvContent, { columns: true, skip_empty_lines: true });
+
+    // Clear existing table before importing
+    await pool.query(`TRUNCATE TABLE ${table} RESTART IDENTITY`);
+
+    // Insert rows
+    for (const row of rows) {
+      const columns = Object.keys(row).join(",");
+      const values = Object.values(row)
+        .map(v => `'${v}'`) // simple quoting; sanitize for production!
+        .join(",");
+      await pool.query(`INSERT INTO ${table} (${columns}) VALUES (${values})`);
+    }
+
+    res.json({ success: true, message: `Imported ${rows.length} rows into ${table}` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to import CSV into DB" });
+  }
 });
 
 app.listen(port, hostname, () => {
