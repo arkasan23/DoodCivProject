@@ -71,8 +71,9 @@ export class GameScene extends Phaser.Scene {
   async create() {
     const levelData = this.cache.json.get(this.level);
 
-    // Reset players table
+    // Reset players and units_state table
     await fetch("http://localhost:3000/clear_table?name=players");
+    await fetch("http://localhost:3000/clear_table?name=units_state")
 
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
       const aiName = "AI " + i;

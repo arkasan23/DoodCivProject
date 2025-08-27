@@ -50,6 +50,7 @@ export default class Unit {
     this.damage = unit.damage;
     this.currentHealth = unit.health;
     this.attackRange = unit.attack_range;
+    await fetch(`http://localhost:3000/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`);
   }
 
   async initUnit() {
