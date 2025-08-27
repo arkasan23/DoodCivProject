@@ -31,26 +31,25 @@ export default class EnemyAI {
     for (const unit of this.units) {
       if (unit.moved || unit.currentHealth <= 0) continue;
 
-      // attack
       const enemiesInRange = this.getEnemyUnitsInRange(unit);
       if (enemiesInRange.length > 0) {
         const target = this.chooseAttackTarget(enemiesInRange);
-        //console.log(`${this.name} attacks ${target.id}`);
+        console.log(`${this.name} attacks ${target.id}`);
         unit.attack(target);
         unit.moved = true;
         continue;
       }
 
-      // move towards enemy
       const enemyTile = this.findNearestEnemyTile(unit);
       if (enemyTile) {
+        console.log("moved towards enemy tile");
         this.advanceToward(unit, enemyTile);
         continue;
       }
 
-      // claim neutral tile
       const neutralTile = this.findNearestNeutralTile(unit);
       if (neutralTile) {
+        console.log("move to neutralTile");
         this.moveAndClaim(unit, neutralTile);
         continue;
       }
@@ -88,6 +87,7 @@ export default class EnemyAI {
             spawnTile.r,
             unitType,
             this.name,
+            unitType,
           );
 
           spawnTile.unit = newUnit;
@@ -197,7 +197,9 @@ export default class EnemyAI {
       if (other.currentHealth <= 0) return false;
       if (!other.boundTile) return false;
 
-      return attackableTiles.includes(other.boundTile);
+      return attackableTiles.some(
+        (tile) => tile.q === other.boundTile.q && tile.r === other.boundTile.r,
+      );
     });
   }
 
