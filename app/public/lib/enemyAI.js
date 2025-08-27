@@ -46,7 +46,7 @@ export default class EnemyAI {
         this.advanceToward(unit, enemyTile);
         continue;
       }
-
+      // claim neutral tile
       const neutralTile = this.findNearestNeutralTile(unit);
       if (neutralTile) {
         console.log("move to neutralTile");
@@ -93,6 +93,7 @@ export default class EnemyAI {
           spawnTile.unit = newUnit;
           newUnit.boundTile = spawnTile;
           newUnit.moveToTile(spawnTile);
+          newUnit.moved = true;
 
           this.addUnit(newUnit);
           this.scene.units.push(newUnit);

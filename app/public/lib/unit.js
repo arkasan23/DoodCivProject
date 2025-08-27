@@ -86,11 +86,14 @@ export default class Unit {
 
       const nearestTile = this.getNearestTile(dragX, dragY);
       const reachable = this.getReachableTiles(this.scene.tiles);
+      const attackable = this.getAttackableTiles(this.scene.tiles);
 
       if (
         nearestTile &&
-        reachable.includes(nearestTile) &&
-        (!nearestTile.unit || nearestTile.unit.owner !== this.owner)
+        ((reachable.includes(nearestTile) && !nearestTile.unit) ||
+          (attackable.includes(nearestTile) &&
+            nearestTile.unit &&
+            nearestTile.unit.owner !== this.owner))
       ) {
         this.sprite.x = nearestTile.x;
         this.sprite.y = nearestTile.y;
@@ -111,30 +114,17 @@ export default class Unit {
       }
 
       const reachable = this.getReachableTiles(this.scene.tiles);
+      const attackable = this.getAttackableTiles(this.scene.tiles);
 
       if (
-        !reachable.includes(tile) &&
-        !(tile.q === this.q && tile.r === this.r)
+        attackable.includes(tile) &&
+        tile.unit &&
+        tile.unit.owner !== this.owner
       ) {
-        this.resetPosition();
-        return;
-      }
-
-      if (tile.unit && tile.unit.owner !== this.owner) {
         const enemy = tile.unit;
         this.attack(enemy);
 
-        if (enemy.currentHealth <= 0) {
-          if (this.boundTile) {
-            this.boundTile.unit = null;
-          }
-          this.moveToTile(tile);
-        } else {
-          this.resetPosition();
-        }
-
         this.moved = true;
-        //this.updateTint();
         this.sprite.setTint(0x888888);
         return;
       }
@@ -144,20 +134,28 @@ export default class Unit {
         return;
       }
 
-      if (this.boundTile) {
-        this.boundTile.unit = null;
+      if (reachable.includes(tile) && !tile.unit) {
+        if (this.boundTile) this.boundTile.unit = null;
+        this.resetPosition();
+        this.moveToTile(tile);
+        this.moved = true;
+        this.sprite.setTint(0x888888);
+        return;
       }
-      this.moveToTile(tile);
-      this.moved = true;
-      //this.updateTint();
-      this.sprite.setTint(0x888888);
+
+      this.resetPosition();
     });
 
-    this.sprite.on("dragend", (_pointer, dropped) => {
+    this.sprite.on("dragend", (pointer, dropped) => {
       if (this.owner !== "Player 1") return;
-      if (!this.boundTile) {
+
+      const nearestTile = this.getNearestTile(this.sprite.x, this.sprite.y);
+      const reachable = this.getReachableTiles(this.scene.tiles);
+
+      if (!nearestTile || !reachable.includes(nearestTile)) {
         this.resetPosition();
       }
+
       this.sprite.setDepth(10);
       this.clearHighlights();
     });
@@ -182,13 +180,18 @@ export default class Unit {
 
   highlightReachableTiles() {
     this.clearHighlights();
-    const reachable = this.getReachableTiles(this.scene.tiles);
 
+    const reachable = this.getReachableTiles(this.scene.tiles);
     reachable.forEach((tile) => {
       if (!tile.unit) {
         tile.setColor(0xffff66);
         this.scene.highlightedTiles.push(tile);
-      } else if (tile.unit.owner !== this.owner) {
+      }
+    });
+
+    const attackable = this.getAttackableTiles(this.scene.tiles);
+    attackable.forEach((tile) => {
+      if (tile.unit && tile.unit.owner !== this.owner) {
         tile.setColor(0xff6666);
         this.scene.highlightedTiles.push(tile);
       }
@@ -300,12 +303,7 @@ export default class Unit {
   moveToTile(tile) {
     this.q = tile.q;
     this.r = tile.r;
-    this.sprite.x = tile.x;
-    this.sprite.y = tile.y;
-    this.startX = tile.x;
-    this.startY = tile.y;
 
-    //  this.boundTile.unit = null;
     if (this.boundTile) {
       this.boundTile.unit = null;
     }
@@ -313,6 +311,20 @@ export default class Unit {
     tile.unit = this;
     this.boundTile = tile;
     tile.setOwner(this.owner);
+
+    this.scene.tweens.add({
+      targets: this.sprite,
+      x: tile.x,
+      y: tile.y,
+      duration: 300,
+      ease: "Power2",
+      onComplete: () => {
+        this.sprite.x = tile.x;
+        this.sprite.y = tile.y;
+        this.startX = tile.x;
+        this.startY = tile.y;
+      },
+    });
   }
 
   resetPosition() {
@@ -321,22 +333,77 @@ export default class Unit {
   }
 
   attack(targetUnit) {
-    // console.log(this.id + " attacks " + targetUnit.id);
-    // console.log(targetUnit);
-    // console.log(targetUnit.currentHealth);
-    if (!targetUnit || typeof targetUnit.currentHealth !== "number") {
-      console.warn("Invalid targetUnit:", targetUnit);
-      //return;
-    }
+    if (!targetUnit || typeof targetUnit.currentHealth !== "number") return;
 
-    targetUnit.currentHealth -= this.damage;
-    targetUnit.updateTint();
+    const scene = this.scene;
+    const targetX = targetUnit.sprite.x;
+    const targetY = targetUnit.sprite.y;
 
-    if (targetUnit.currentHealth <= 0) {
-      targetUnit.destroy();
-    }
+    const homeX = this.boundTile ? this.boundTile.x : this.sprite.x;
+    const homeY = this.boundTile ? this.boundTile.y : this.sprite.y;
 
-    this.scene.selectedUnit = null;
+    const oldDepth = this.sprite.depth;
+    this.sprite.setDepth(999);
+
+    scene.tweens.add({
+      targets: this.sprite,
+      x: targetX,
+      y: targetY,
+      duration: 200,
+      ease: "Power2",
+      onComplete: () => {
+        targetUnit.currentHealth -= this.damage;
+        targetUnit.updateTint();
+
+        const targetDestroyed = targetUnit.currentHealth <= 0;
+
+        if (targetDestroyed) {
+          targetUnit.destroy();
+        } else {
+          scene.tweens.add({
+            targets: targetUnit.sprite,
+            alpha: 0.5,
+            duration: 80,
+            yoyo: true,
+            repeat: 1,
+          });
+        }
+
+        const isAdjacent =
+          Math.abs(this.q - targetUnit.q) <= 1 &&
+          Math.abs(this.r - targetUnit.r) <= 1;
+
+        let finalX = homeX;
+        let finalY = homeY;
+
+        if (targetDestroyed && isAdjacent) {
+          if (this.boundTile) this.boundTile.unit = null;
+
+          this.q = targetUnit.q;
+          this.r = targetUnit.r;
+          this.boundTile = targetUnit.boundTile;
+
+          if (this.boundTile) {
+            this.boundTile.unit = this;
+            this.boundTile.setOwner(this.owner);
+            finalX = this.boundTile.x;
+            finalY = this.boundTile.y;
+          }
+        }
+
+        scene.tweens.add({
+          targets: this.sprite,
+          x: finalX,
+          y: finalY,
+          duration: 200,
+          ease: "Power2",
+          onComplete: () => {
+            this.sprite.setDepth(oldDepth);
+            scene.selectedUnit = null;
+          },
+        });
+      },
+    });
   }
 
   destroy() {
