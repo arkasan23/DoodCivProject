@@ -9,34 +9,39 @@ export class Menu extends Phaser.Scene {
     this.load.audio("menuMusic", "assets/test.mp3");
     this.load.image("soundOn", "assets/sound-on.png");
     this.load.image("soundOff", "assets/sound-off.png");
+    this.load.image("menuLevel", "assets/AmongusHex.png");
   }
 
   create() {
     // generate tiles in the menu
 
-    this.tiles = [];
-    const radius = 30;
-    const cols = 10;
-    const rows = 10;
-    const hexWidth = Math.sqrt(3) * radius;
-    const hexHeight = 2 * radius;
-    const gridPixelWidth = hexWidth * cols + hexWidth / 2;
-    const gridPixelHeight = hexHeight * 0.75 * rows + hexHeight / 4;
+    // this.tiles = [];
+    // const radius = 30;
+    // const cols = 10;
+    // const rows = 10;
+    // const hexWidth = Math.sqrt(3) * radius;
+    // const hexHeight = 2 * radius;
+    // const gridPixelWidth = hexWidth * cols + hexWidth / 2;
+    // const gridPixelHeight = hexHeight * 0.75 * rows + hexHeight / 4;
 
-    const offsetX = (this.sys.game.config.width - gridPixelWidth) / 2;
-    const offsetY = (this.sys.game.config.height - gridPixelHeight) / 2;
+    // const offsetX = (this.sys.game.config.width - gridPixelWidth) / 2;
+    // const offsetY = (this.sys.game.config.height - gridPixelHeight) / 2;
 
-    for (let r = 0; r < rows; r++) {
-      for (let q = 0; q < cols; q++) {
-        const tile = new Tile(this, q, r, offsetX, offsetY, 0x88cc88);
-        this.tiles.push(tile);
-      }
-    }
-    //
-    this.menu = this.add.group();
+    // for (let r = 0; r < rows; r++) {
+    //   for (let q = 0; q < cols; q++) {
+    //     const tile = new Tile(this, q, r, offsetX, offsetY, 0x88cc88);
+    //     this.tiles.push(tile);
+    //   }
+    // }
 
     const centerX = this.scale.width / 2;
     const centerY = this.scale.height / 2;
+    
+    const htAttackImg = this.add.image( centerX + 150, centerY, "menuLevel");
+
+    //
+    this.menu = this.add.group();
+
 
     let music = this.sound.add("menuMusic", {
       loop: true,
