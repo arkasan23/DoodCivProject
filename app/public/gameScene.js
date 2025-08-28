@@ -33,6 +33,20 @@ export class GameScene extends Phaser.Scene {
 
   init(data) {
     this.level = data.level;
+    // Reset scene-level state
+    this.players = ["Player 1"];
+    this.turnIndex = 0;
+    this.round = 1;
+    this.AIs = [];
+    this.tiles = new Map();
+    this.units = [];
+    this.highlightedTiles = [];
+    this.selectedUnit = null;
+    this.targetUnit = null;
+    this._playerGold = 100;
+    this.turnText = null;
+    this.endTurnBtn = null;
+    this.goldText = null;
   }
 
   get playerGold() {
