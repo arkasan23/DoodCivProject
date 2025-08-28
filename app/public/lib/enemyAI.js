@@ -29,33 +29,39 @@ export default class EnemyAI {
     await this.tryToBuyUnits();
 
     for (const unit of this.units) {
-      if (unit.moved || unit.currentHealth <= 0) continue;
+      if (unit.currentHealth <= 0) continue;
 
-      const enemiesInRange = this.getEnemyUnitsInRange(unit);
-      if (enemiesInRange.length > 0) {
-        const target = this.chooseAttackTarget(enemiesInRange);
-        console.log(`${this.name} attacks ${target.id}`);
-        unit.attack(target);
-        unit.moved = true;
-        continue;
-      }
+      let moveLimt = 8;
 
-      const enemyTile = this.findNearestEnemyTile(unit);
-      if (enemyTile) {
-        console.log("moved towards enemy tile");
-        this.advanceToward(unit, enemyTile);
-        continue;
-      }
-      // claim neutral tile
-      const neutralTile = this.findNearestNeutralTile(unit);
-      if (neutralTile) {
-        console.log("move to neutralTile");
-        this.moveAndClaim(unit, neutralTile);
-        continue;
-      }
+      while (unit.movesLeft > 0 && moveLimt > 0) {
+        const enemiesInRange = this.getEnemyUnitsInRange(unit);
+        if (enemiesInRange.length > 0) {
+          const target = this.chooseAttackTarget(enemiesInRange);
+          console.log(`${this.name} attacks ${target.id}`);
+          unit.attack(target);
+          unit.movesLeft = 0;
+          break;
+        }
 
-      // wonder randomnly
-      this.wander(unit);
+        const enemyTile = this.findNearestEnemyTile(unit);
+        if (enemyTile) {
+          console.log("moved towards enemy tile");
+          this.advanceToward(unit, enemyTile);
+          moveLimt--;
+          continue;
+        }
+        // claim neutral tile
+        const neutralTile = this.findNearestNeutralTile(unit);
+        if (neutralTile) {
+          console.log("move to neutralTile");
+          this.moveAndClaim(unit, neutralTile);
+          moveLimt--;
+          continue;
+        }
+
+        this.wander(unit);
+        moveLimt--;
+      }
     }
   }
 
@@ -93,7 +99,7 @@ export default class EnemyAI {
           spawnTile.unit = newUnit;
           newUnit.boundTile = spawnTile;
           newUnit.moveToTile(spawnTile);
-          newUnit.moved = true;
+          newUnit.movesLeft = 0;
 
           this.addUnit(newUnit);
           this.scene.units.push(newUnit);
@@ -121,7 +127,7 @@ export default class EnemyAI {
     tile.unit = unit;
     tile.setOwner(this.name);
     unit.boundTile = tile;
-    unit.moved = true;
+    unit.movesLeft--;
   }
 
   wander(unit) {

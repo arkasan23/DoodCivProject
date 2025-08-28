@@ -22,20 +22,13 @@ export default class Unit {
     this.sprite.setDepth(10);
     this.sprite.unitObj = this;
 
-    /*
-    this.sprite.on("pointerdown", (pointer) => {
-      if (scene.selectedUnit && scene.selectedUnit !== this) {
-        scene.selectedUnit.attack(this);
-      } else {
-        scene.selectedUnit = this;
-      }
-    });
-    */
-
     scene.input.setDraggable(this.sprite);
 
     this.startX = x;
     this.startY = y;
+
+    this.movementRange = 1;
+    this.movesLeft = this.movementRange;
 
     this.registerDragEvents();
     //8000;
@@ -50,7 +43,10 @@ export default class Unit {
     this.damage = unit.damage;
     this.currentHealth = unit.health;
     this.attackRange = unit.attack_range;
-    await fetch(`http://localhost:3000/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`);
+    this.movesLeft = this.movementRange;
+    await fetch(
+      `http://localhost:3000/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`,
+    );
   }
 
   async initUnit() {
@@ -74,7 +70,7 @@ export default class Unit {
     const scene = this.scene;
 
     this.sprite.on("dragstart", () => {
-      if (this.moved) return;
+      if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 
       this.sprite.setDepth(2000);
@@ -82,7 +78,7 @@ export default class Unit {
     });
 
     this.sprite.on("drag", (_pointer, dragX, dragY) => {
-      if (this.moved) return;
+      if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 
       const nearestTile = this.getNearestTile(dragX, dragY);
@@ -105,8 +101,8 @@ export default class Unit {
     });
 
     this.sprite.on("drop", (_pointer, dropZone) => {
-      if (this.moved) return;
       if (this.owner !== "Player 1") return;
+      if (this.movesLeft <= 0) return;
 
       const tile = dropZone.getData("tileObj");
       if (!tile) {
@@ -125,7 +121,7 @@ export default class Unit {
         const enemy = tile.unit;
         this.attack(enemy);
 
-        this.moved = true;
+        this.movesLeft = 0;
         this.sprite.setTint(0x888888);
         return;
       }
@@ -139,8 +135,11 @@ export default class Unit {
         if (this.boundTile) this.boundTile.unit = null;
         this.resetPosition();
         this.moveToTile(tile);
-        this.moved = true;
-        this.sprite.setTint(0x888888);
+        this.movesLeft--;
+        //this.moved = true;
+        if (this.movesLeft <= 0) {
+          this.sprite.setTint(0x888888);
+        }
         return;
       }
 
@@ -199,23 +198,16 @@ export default class Unit {
     });
   }
 
+  getDistance(a, b) {
+    return (
+      (Math.abs(a.q - b.q) +
+        Math.abs(a.q + a.r - b.q - b.r) +
+        Math.abs(a.r - b.r)) /
+      2
+    );
+  }
+
   clearHighlights() {
-    this.sprite.on("drop", (_pointer, dropZone) => {
-      const tile = dropZone?.getData("tileObj");
-      if (!tile || tile.unit) {
-        return;
-      }
-
-      const reachable = this.getReachableTiles(this.scene.tiles);
-      if (
-        !reachable.includes(tile) &&
-        !(tile.q === this.q && tile.r === this.r)
-      ) {
-        return;
-      }
-
-      this.moveToTile(tile);
-    });
     this.scene.highlightedTiles.forEach((tile) =>
       tile.setColor(tile.baseColor),
     );
@@ -223,7 +215,8 @@ export default class Unit {
   }
 
   incrementTurn() {
-    this.moved = false;
+    this.movesLeft = this.movementRange;
+    //  this.moved = false;
     this.sprite.clearTint();
     //  this.updateTint();
   }
@@ -246,7 +239,7 @@ export default class Unit {
 
     while (frontier.length) {
       const current = frontier.shift();
-      if (current.dist < this.movementRange) {
+      if (current.dist < 1) {
         for (let dir of directions) {
           const nq = current.q + dir.dq;
           const nr = current.r + dir.dr;
