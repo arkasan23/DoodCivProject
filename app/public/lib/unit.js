@@ -14,18 +14,25 @@ export default class Unit {
     // this.sprite.unitId = this.id; // sprite attaches to unit id
     //this.id = null;
 
-    const { x, y } = this.axialToPixel(q, r, 30);
+    const tile = scene.tiles.get('${q},${r}');
+    if (!tile) {
+      throw new Error('Tile not found at q:${q}, r:${r} when spawning unit');
+    }
+    this.boundTile = tile;
+    tile.unit = this;
+
     this.sprite = scene.add
-      .image(x, y, textureKey)
+      .image(tile.x, tile.y, textureKey)
       .setScale(0.5)
       .setInteractive({ useHandCursor: true });
+
     this.sprite.setDepth(10);
     this.sprite.unitObj = this;
 
     scene.input.setDraggable(this.sprite);
 
-    this.startX = x;
-    this.startY = y;
+    this.startX = tile.x;
+    this.startY = tile.y;
 
     this.movementRange = 1;
     this.movesLeft = this.movementRange;

@@ -228,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.createBackButton();
+    this.createSaveLoadButtons();
   }
 
   shutdown() {
@@ -323,6 +324,68 @@ export class GameScene extends Phaser.Scene {
     // Keep it responsive on resize
     this.scale.on("resize", (size) => {
       backBtn.setPosition(80, size.height - 40);
+    });
+  }
+
+  createSaveLoadButtons() {
+    const x = this.scale.width - 80;
+    const yStart = this.scale.height - 120;
+  
+    const saveBtn = this.add.text(x, yStart, "💾 Save", {
+      fontSize: "16px",
+      backgroundColor: "#006600",
+      color: "#ffffff",
+      padding: { x: 10, y: 5 },
+    }).setOrigin(0.5).setInteractive();
+  
+    const loadBtn = this.add.text(x, yStart + 40, "📂 Load", {
+      fontSize: "16px",
+      backgroundColor: "#004488",
+      color: "#ffffff",
+      padding: { x: 10, y: 5 },
+    }).setOrigin(0.5).setInteractive();
+  
+    saveBtn.on("pointerdown", () => {
+      const level = this.level;
+      this.saveTable(level, "players");
+      this.saveTable(level, "units_state");
+      this.saveTurnState(level);
+      this.saveTiles(level);
+    });
+  
+    loadBtn.on("pointerdown", async () => {
+      const level = this.level;
+    
+      await this.importTable(level, "players");
+      await this.importTable(level, "units_state");
+      await this.loadTurnState(level);
+      await this.loadTiles(level); 
+      await this.loadUnitDataFromDB(); 
+    });
+
+    saveBtn.on('pointerover', () => {
+      saveBtn.setTint(0xaaaaaa);
+      saveBtn.scene.input.setDefaultCursor('pointer');
+    });
+    
+    saveBtn.on('pointerout', () => {
+      saveBtn.clearTint(); 
+      saveBtn.scene.input.setDefaultCursor('default');
+    });
+    
+    loadBtn.on('pointerover', () => {
+      loadBtn.setTint(0xaaaaaa); 
+      loadBtn.scene.input.setDefaultCursor('pointer');
+    });
+    
+    loadBtn.on('pointerout', () => {
+      loadBtn.clearTint(); 
+      loadBtn.scene.input.setDefaultCursor('default');
+    });
+  
+    this.scale.on("resize", (size) => {
+      saveBtn.setPosition(size.width - 80, size.height - 120);
+      loadBtn.setPosition(size.width - 80, size.height - 80);
     });
   }
 
@@ -425,27 +488,43 @@ export class GameScene extends Phaser.Scene {
     try {
       const res = await fetch(`/get_all_units`);
       const unitsData = await res.json();
-
-      /* 
+  
+      // Clear any existing units first
+      this.units.forEach((unit) => unit.sprite.destroy());
+      this.units = [];
+  
       for (let unitData of unitsData) {
-        const unit = new this.Unit(
-          this,
-          unitData.q_pos,
-          unitData.r_pos,
-          unitData.unit_type,
-          unitData.owned_by,
-        );
+        const unit = new this.Unit(this, unitData.q_pos, unitData.r_pos, unitData.unit_type, unitData.owned_by);
         unit.id = unitData.id;
         unit.sprite.unitId = unitData.id;
+      
         const tile = this.tiles.get(`${unit.q_pos},${unit.r_pos}`);
         if (tile) {
-          unit.moveToTile(tile);
           tile.unit = unit;
           unit.boundTile = tile;
+          unit.sprite.x = tile.x;
+          unit.sprite.y = tile.y;
+          unit.startX = tile.x;
+          unit.startY = tile.y;
         }
+      
+        unit.sprite.setInteractive();
+        unit.sprite.on("pointerdown", () => {
+          if (!this.selectedUnit) {
+            if (unit.owner === "Player 1") {
+              this.selectedUnit = unit;
+            }
+            return;
+          }
+          if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
+            this.combat(this.selectedUnit.id, unit.id);
+            this.selectedUnit = null;
+          }
+        });
+      
         this.units.push(unit);
       }
-      */
+  
     } catch (error) {
       console.error("Error loading units from Database:", error);
     }
@@ -535,20 +614,104 @@ export class GameScene extends Phaser.Scene {
     .catch(err => console.error("Error saving table:", err));
   }
 
-  importTable(level, table) {
-    fetch("http://localhost:3000/import_table", {
+  async importTable(level, table) {
+    try {
+      const res = await fetch("http://localhost:3000/import_table", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level, table })
+      });
+  
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+      console.log(result.message);
+    } catch (err) {
+      console.error("Failed to import table:", err);
+    }
+  }
+
+  saveTurnState(level) {
+    fetch("http://localhost:3000/save_turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level, table })
+      body: JSON.stringify({
+        level,
+        turn: this.turnIndex,
+        round: this.round
+      }),
     })
     .then(res => res.json())
     .then(result => {
       if (result.success) {
-        console.log(result.message);
+        console.log("Turn state saved!");
       } else {
-        console.error(result.error);
+        console.error("Failed to save turn state:", result.error);
       }
+    });
+  }
+  
+  loadTurnState(level) {
+    return fetch(`http://localhost:3000/load_turn?level=${level}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          this.turnIndex = data.turn;
+          this.round = data.round;
+          this.renderTurnHud();  // ✅ Call it here always
+          console.log("Turn state loaded.");
+        } else {
+          console.error("Failed to load turn state:", data.error);
+        }
+      });
+  }
+
+  saveTiles(level) {
+    const tilesData = Array.from(this.tiles.values()).map(tile => ({
+      q: tile.q,
+      r: tile.r,
+      color: tile.baseColor,
+      owner: tile.owner || null,
+    }));
+  
+    fetch("http://localhost:3000/save_tiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level, tiles: tilesData }),
     })
-    .catch(err => console.error("Failed to import table:", err));
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        console.log("Tiles saved!");
+      } else {
+        console.error("Failed to save tiles:", result.error);
+      }
+    });
+  }
+  
+  loadTiles(level) {
+    fetch(`http://localhost:3000/load_tiles?level=${level}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const playerColors = {
+            "Player 1": 0x3377cc,
+            "AI 1": 0xd2042d,
+            "AI 2": 0xcc3333,
+          };
+  
+          for (const tileData of data.tiles) {
+            const key = `${tileData.q},${tileData.r}`;
+            const tile = this.tiles.get(key);
+            if (tile) {
+              tile.setColor(parseInt(tileData.color));
+              tile.setOwner(tileData.owner || null);
+            }
+          }
+  
+          console.log("Tiles loaded.");
+        } else {
+          console.error("Failed to load tiles:", data.error);
+        }
+      });
   }
 }
