@@ -219,6 +219,72 @@ app.post("/import_table", async (req, res) => {
   }
 });
 
+app.post("/save_turn", (req, res) => {
+  const { level, turn, round } = req.body;
+  const dir = path.join(__dirname, "public", "saves", level);
+  const filePath = path.join(dir, "turn.json");
+
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify({ turn, round }));
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save turn state" });
+  }
+});
+
+app.get("/load_turn", (req, res) => {
+  const level = req.query.level;
+  const filePath = path.join(__dirname, "public", "saves", level, "turn.json");
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Turn state file not found" });
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, "utf8");
+    const { turn, round } = JSON.parse(content);
+    res.json({ success: true, turn, round });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load turn state" });
+  }
+});
+
+app.post("/save_tiles", (req, res) => {
+  const { level, tiles } = req.body;
+  const dir = path.join(__dirname, "public", "saves", level);
+  const filePath = path.join(dir, "tiles.json");
+
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify({ tiles }));
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save tiles" });
+  }
+});
+
+app.get("/load_tiles", (req, res) => {
+  const level = req.query.level;
+  const filePath = path.join(__dirname, "public", "saves", level, "tiles.json");
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Tiles file not found" });
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, "utf8");
+    const { tiles } = JSON.parse(content);
+    res.json({ success: true, tiles });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load tiles" });
+  }
+});
+
 app.listen(port, hostname, () => {
   console.log(`Listening at: http://${hostname}:${port}`);
 });
