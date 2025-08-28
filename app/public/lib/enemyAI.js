@@ -5,10 +5,46 @@ export default class EnemyAI {
     this.scene = scene;
     this.name = name;
     this.units = [];
-    this.gold = 100;
+    this.gold = 125;
 
-    this.teir1Units = ["warrior", "scout", "slinger"];
+    this.buyableUnits = ["warrior", "scout", "slinger"];
     this.currentTeir = 1;
+    this.turnCounter = 0;
+
+    if (this.scene.game?.events) {
+      this.scene.game.events.on("turn:changed", this.turnChanged, this);
+    }
+  }
+
+  turnChanged(turnNumber) {
+    this.turnCounter++;
+
+    if (this.turnCounter % 5 === 0) {
+      this.currentTeir++;
+      if (this.currentTeir === 2) {
+        this.buyableUnits.push("archer", "horseman", "swordsman");
+        console.log(this.buyableUnits);
+      } else if (this.currentTeir === 3) {
+        this.buyableUnits.push("chariot", "knight", "lancer");
+      } else if (this.currentTeir === 4) {
+        this.buyableUnits.push("musketeer");
+      }
+    }
+  }
+
+  getUnitsOfCurrentTier() {
+    switch (this.currentTeir) {
+      case 1:
+        return ["warrior", "scout", "slinger"];
+      case 2:
+        return ["archer", "horseman", "swordsman"];
+      case 3:
+        return ["chariot", "knight", "lancer"];
+      case 4:
+        return ["musketeer"];
+      default:
+        return [];
+    }
   }
 
   addUnit(unit) {
@@ -21,7 +57,7 @@ export default class EnemyAI {
     const ownedTileCount = Array.from(this.scene.tiles.values()).filter(
       (t) => t.owner === this.name,
     ).length;
-    this.gold += ownedTileCount * 5;
+    this.gold += ownedTileCount * 7;
     console.log(`${this.name} has ${this.gold} gold`);
   }
 
@@ -66,20 +102,27 @@ export default class EnemyAI {
   }
 
   async tryToBuyUnits() {
-    let possibleUnits = [...this.teir1Units];
+    const currentTierUnits = this.getUnitsOfCurrentTier();
+    const allUnits = [
+      ...currentTierUnits,
+      ...this.buyableUnits.filter((u) => !currentTierUnits.includes(u)),
+    ];
 
-    while (possibleUnits.length > 0) {
-      const unitType = Phaser.Utils.Array.GetRandom(possibleUnits);
+    let boughtUnit = true;
 
-      try {
-        const response = await fetch(
-          `http://localhost:3000/get_unit?unitName=${unitType}`,
-        );
-        const data = await response.json();
-        const unitCost = data.cost;
-        console.log(`${unitType} costs ${unitCost} gold`);
+    while (boughtUnit) {
+      boughtUnit = false;
 
-        if (this.gold >= unitCost) {
+      for (const unitType of allUnits) {
+        try {
+          const response = await fetch(
+            `http://localhost:3000/get_unit?unitName=${unitType}`,
+          );
+          const data = await response.json();
+          const unitCost = data.cost;
+
+          if (this.gold < unitCost) continue;
+
           const ownedTiles = Array.from(this.scene.tiles.values()).filter(
             (t) => t.owner === this.name && !t.unit,
           );
@@ -109,16 +152,17 @@ export default class EnemyAI {
             `${this.name} bought a ${unitType} on (${spawnTile.q},${spawnTile.r}) for ${unitCost} gold`,
           );
 
-          return;
+          boughtUnit = true;
+          break; // try buying another unit from start of array
+        } catch (err) {
+          console.error("Failed to fetch unit cost:", err);
         }
-      } catch (err) {
-        console.error("Failed to fetch unit cost:", err);
       }
-
-      possibleUnits = possibleUnits.filter((u) => u !== unitType);
     }
 
-    console.log(`${this.name} cannot afford any tier 1 units`);
+    console.log(
+      `${this.name} has ${this.gold} gold remaining after buying units.`,
+    );
   }
 
   moveAndClaim(unit, tile) {
