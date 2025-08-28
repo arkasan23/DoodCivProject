@@ -22,6 +22,8 @@ export class MapCreatorScene extends Phaser.Scene {
     const hexHeight = 2 * radius;
     const offsetX = (this.scale.width - (cols * hexWidth + hexWidth / 2)) / 2;
     const offsetY = (this.scale.height - (rows * hexHeight * 0.75 + hexHeight / 4)) / 2;
+    this.offsetX = offsetX;
+    this.offsetY = offsetY;
 
     this.tiles.clear();
 
@@ -30,13 +32,14 @@ export class MapCreatorScene extends Phaser.Scene {
         const tile = new Tile(this, q, r, offsetX, offsetY, 0x808080); // default color
         tile.graphics.setInteractive();
         tile.graphics.on("pointerdown", () => {
-            if (this.selectedColor === null) {
-              tile.graphics.destroy();
-              this.tiles.delete(`${tile.q},${tile.r}`);
-            } else {
-              tile.setColor(this.selectedColor, true);
-            }
-          });
+          if (this.selectedColor === null) {
+            tile.graphics.destroy();
+            this.tiles.delete(`${tile.q},${tile.r}`);
+          } else if (this.selectedColor === "restore") {
+          } else {
+            tile.setColor(this.selectedColor, true);
+          }
+        });
         this.tiles.set(`${q},${r}`, tile);
       }
     }
@@ -44,6 +47,33 @@ export class MapCreatorScene extends Phaser.Scene {
     this.createPalette();
     this.createSaveButton();
     this.createBackButton();
+
+    this.input.on("pointerdown", (pointer) => {
+      if (this.selectedColor !== "restore") return;
+    
+      const local = pointer.positionToCamera(this.cameras.main);
+      const tileX = local.x - this.offsetX;
+      const tileY = local.y - this.offsetY;
+      const { q, r } = this.pixelToAxial(tileX, tileY);
+    
+      const key = `${q},${r}`;
+      if (this.tiles.has(key)) return;
+    
+      const tile = new Tile(this, q, r, offsetX, offsetY, 0x808080);
+      tile.graphics.setInteractive();
+      tile.graphics.on("pointerdown", () => {
+        if (this.selectedColor === null) {
+          tile.graphics.destroy();
+          this.tiles.delete(`${tile.q},${tile.r}`);
+        } else if (this.selectedColor === "restore") {
+          // Already handled
+        } else {
+          tile.setColor(this.selectedColor, true);
+        }
+      });
+    
+      this.tiles.set(key, tile);
+    });
   }
 
   createPalette() {
@@ -52,6 +82,7 @@ export class MapCreatorScene extends Phaser.Scene {
       { label: "Player", color: 0x3377cc },
       { label: "Enemy", color: 0xd2042d },
       { label: "Remove", color: null },
+      { label: "Restore", color: "restore" },
     ];
   
     palette.forEach((entry, i) => {
@@ -66,8 +97,9 @@ export class MapCreatorScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .setOrigin(0.5);
   
-      btn.on("pointerdown", () => {
+      btn.on("pointerdown", (pointer, localX, localY, event) => {
         this.selectedColor = entry.color;
+        event.stopPropagation();
       });
     });
   }
@@ -131,5 +163,37 @@ export class MapCreatorScene extends Phaser.Scene {
     a.href = URL.createObjectURL(blob);
     a.download = "custom_map.json";
     a.click();
+  }
+
+  pixelToAxial(x, y) {
+    const radius = 30;
+    const q = ((Math.sqrt(3) / 3 * x) - (1 / 3 * y)) / radius;
+    const r = (2 / 3 * y) / radius;
+  
+    return this.hexRound(q, r);
+  }
+  
+  hexRound(q, r) {
+    let x = q;
+    let z = r;
+    let y = -x - z;
+  
+    let rx = Math.round(x);
+    let ry = Math.round(y);
+    let rz = Math.round(z);
+  
+    const x_diff = Math.abs(rx - x);
+    const y_diff = Math.abs(ry - y);
+    const z_diff = Math.abs(rz - z);
+  
+    if (x_diff > y_diff && x_diff > z_diff) {
+      rx = -ry - rz;
+    } else if (y_diff > z_diff) {
+      ry = -rx - rz;
+    } else {
+      rz = -rx - ry;
+    }
+  
+    return { q: rx, r: rz };
   }
 }

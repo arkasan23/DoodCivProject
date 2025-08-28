@@ -210,8 +210,13 @@ export class LevelSelect extends Phaser.Scene {
       reader.onload = (e) => {
         const mapJson = JSON.parse(e.target.result);
     
-        const levelName = prompt("Enter a name for this level:");
-        if (!levelName) return;
+        this.showNameInput((levelName) => {
+          const existingMaps = JSON.parse(localStorage.getItem("customMaps") || "{}");
+          existingMaps[levelName] = mapJson;
+          localStorage.setItem("customMaps", JSON.stringify(existingMaps));
+      
+          alert(`Map "${levelName}" loaded! You can now view it from 'View Uploaded Maps'.`);
+        });
     
         // Save to localStorage
         const existingMaps = JSON.parse(localStorage.getItem("customMaps") || "{}");
@@ -286,5 +291,75 @@ export class LevelSelect extends Phaser.Scene {
         this.mapButtons.push(btn, delBtn);
       });
     });
+  }
+
+  showNameInput(callback) {
+    // Prevent duplicates
+    if (document.getElementById("mapNameModal")) return;
+  
+    const modal = document.createElement("div");
+    modal.id = "mapNameModal";
+    modal.style.position = "fixed";
+    modal.style.top = "0";
+    modal.style.left = "0";
+    modal.style.width = "100vw";
+    modal.style.height = "100vh";
+    modal.style.backgroundColor = "rgba(0, 0, 0, 0.75)";
+    modal.style.display = "flex";
+    modal.style.alignItems = "center";
+    modal.style.justifyContent = "center";
+    modal.style.zIndex = 1000;
+  
+    const form = document.createElement("div");
+    form.style.background = "#222";
+    form.style.padding = "30px";
+    form.style.border = "3px solid #555";
+    form.style.borderRadius = "10px";
+    form.style.textAlign = "center";
+    form.style.fontFamily = '"JetBrains Mono", monospace';
+    form.style.color = "#fff";
+    form.style.minWidth = "300px";
+  
+    const label = document.createElement("label");
+    label.innerText = "Enter a name for this map:";
+    label.style.display = "block";
+    label.style.marginBottom = "12px";
+    label.style.fontSize = "18px";
+  
+    const input = document.createElement("input");
+    input.type = "text";
+    input.style.width = "100%";
+    input.style.padding = "10px";
+    input.style.border = "none";
+    input.style.borderRadius = "4px";
+    input.style.fontSize = "16px";
+    input.style.backgroundColor = "#111";
+    input.style.color = "#fff";
+  
+    const submitBtn = document.createElement("button");
+    submitBtn.innerText = "Save Map";
+    submitBtn.style.marginTop = "20px";
+    submitBtn.style.padding = "10px 20px";
+    submitBtn.style.backgroundColor = "#3377cc";
+    submitBtn.style.color = "#fff";
+    submitBtn.style.border = "none";
+    submitBtn.style.borderRadius = "4px";
+    submitBtn.style.fontSize = "16px";
+    submitBtn.style.cursor = "pointer";
+  
+    submitBtn.addEventListener("click", () => {
+      const name = input.value.trim();
+      if (!name) return;
+      callback(name);
+      document.body.removeChild(modal);
+    });
+  
+    form.appendChild(label);
+    form.appendChild(input);
+    form.appendChild(submitBtn);
+    modal.appendChild(form);
+    document.body.appendChild(modal);
+  
+    input.focus();
   }
 }
