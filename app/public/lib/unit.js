@@ -16,7 +16,7 @@ export default class Unit {
 
     const tile = scene.tiles.get(`${q},${r}`);
     if (!tile) {
-      throw new Error('Tile not found at q:${q}, r:${r} when spawning unit');
+      throw new Error("Tile not found at q:${q}, r:${r} when spawning unit");
     }
     this.boundTile = tile;
     tile.unit = this;
@@ -154,14 +154,18 @@ export default class Unit {
     });
 
     this.sprite.on("dragend", (pointer, dropped) => {
+      //if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 
       const nearestTile = this.getNearestTile(this.sprite.x, this.sprite.y);
       const reachable = this.getReachableTiles(this.scene.tiles);
 
+      this.resetPosition();
+
+      /*
       if (!nearestTile || !reachable.includes(nearestTile)) {
-        this.resetPosition();
       }
+      */
 
       this.sprite.setDepth(10);
       this.clearHighlights();
