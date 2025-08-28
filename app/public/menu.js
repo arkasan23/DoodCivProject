@@ -92,7 +92,7 @@ export class Menu extends Phaser.Scene {
       align: "center",
     });
 
-    let tutorialButton = this.add.text(-500, centerY + 125, "Tutorial", {
+    let howToButton = this.add.text(-500, centerY + 125, "How To Play", {
       fontFamily: '"JetBrains Mono", monospace',
       fontSize: "32px",
       color: "#ffffff",
@@ -113,13 +113,13 @@ export class Menu extends Phaser.Scene {
     title.setOrigin(0.5);
     subTitle.setOrigin(0.5);
     playButton.setOrigin(0.5);
-    tutorialButton.setOrigin(0.5);
+    howToButton.setOrigin(0.5);
     createMapButton.setOrigin(0.5);
 
     this.menu.add(title);
     this.menu.add(subTitle);
     this.menu.add(playButton);
-    this.menu.add(tutorialButton);
+    this.menu.add(howToButton);
     this.menu.add(createMapButton);
 
     this.tweens.add({
@@ -147,7 +147,7 @@ export class Menu extends Phaser.Scene {
     });
 
     this.tweens.add({
-      targets: tutorialButton,
+      targets: howToButton,
       x: centerX - 400,
       ease: "Sine.easeOut",
       duration: 1000,
@@ -163,7 +163,7 @@ export class Menu extends Phaser.Scene {
     });
 
     playButton.setInteractive({ useHandCursor: true });
-    tutorialButton.setInteractive({ useHandCursor: true });
+    howToButton.setInteractive({ useHandCursor: true });
     createMapButton.setInteractive({ useHandCursor: true });
 
     playButton.on("pointerover", () => {
@@ -180,18 +180,18 @@ export class Menu extends Phaser.Scene {
       this.scene.start("level_select");
     });
 
-    tutorialButton.on("pointerover", () => {
-      tutorialButton.setStyle({ fill: "#ff0" });
+    howToButton.on("pointerover", () => {
+      howToButton.setStyle({ fill: "#ff0" });
     });
 
-    tutorialButton.on("pointerout", () => {
-      tutorialButton.setStyle({ fill: "#fff" });
+    howToButton.on("pointerout", () => {
+      howToButton.setStyle({ fill: "#fff" });
     });
 
-    tutorialButton.on("pointerdown", () => {
-      console.log("Tutorial button clicked");
+    howToButton.on("pointerdown", () => {
+      console.log("How To Play button clicked");
       // Switch scenes here
-      this.scene.start("tutorial");
+      this.scene.start("howto");
     });
 
     createMapButton.on("pointerover", () => {

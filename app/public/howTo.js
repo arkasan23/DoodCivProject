@@ -1,6 +1,6 @@
-export class Tutorial extends Phaser.Scene {
+export class HowTo extends Phaser.Scene {
   constructor() {
-    super("tutorial");
+    super("howto");
   }
 
   preload() {
@@ -81,7 +81,7 @@ export class Tutorial extends Phaser.Scene {
     backBtn.on("pointerout", () => backBtn.setStyle({ fill: "#fff" }));
 
     backBtn.on("pointerdown", () => {
-      console.log("Tutorial -> To Menu");
+      console.log("How To Play -> To Menu");
       this.scene.start("menu");
     });
   }
