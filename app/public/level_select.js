@@ -20,6 +20,15 @@ export class LevelSelect extends Phaser.Scene {
     const centerX = this.scale.width / 2;
     const centerY = this.scale.height / 2;
 
+    let tutorialBtn = this.add.text(-500, centerY - 225, "Tutorial", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "32px",
+      color: "#ffffff",
+      backgroundColor: "#3377cc",
+      padding: { x: 20, y: 10 },
+      align: "center",
+    });
+
     let level1 = this.add.text(-500, centerY - 150, "Level 1", {
       fontFamily: '"JetBrains Mono", monospace',
       fontSize: "32px",
@@ -74,6 +83,7 @@ export class LevelSelect extends Phaser.Scene {
       align: "center",
     });
 
+    tutorialBtn.setOrigin(0.5);
     level1.setOrigin(0.5);
     level2.setOrigin(0.5);
     level3.setOrigin(0.5);
@@ -81,12 +91,21 @@ export class LevelSelect extends Phaser.Scene {
     viewMapsBtn.setOrigin(0.5);
     backButton.setOrigin(0.5);
 
+    this.menu.add(tutorialBtn);
     this.menu.add(level1);
     this.menu.add(level2);
     this.menu.add(level3);
     this.menu.add(backButton);
     this.menu.add(loadMapBtn);
     this.menu.add(viewMapsBtn);
+
+    this.tweens.add({
+      targets: tutorialBtn,
+      x: centerX,
+      ease: "Sine.easeOut",
+      duration: 1000,
+      delay: 0,
+    });
 
     this.tweens.add({
       targets: level1,
@@ -136,10 +155,24 @@ export class LevelSelect extends Phaser.Scene {
       delay: 1000,
     });
 
+    tutorialBtn.setInteractive({ useHandCursor: true });
     level1.setInteractive({ useHandCursor: true });
     level2.setInteractive({ useHandCursor: true });
     level3.setInteractive({ useHandCursor: true });
     backButton.setInteractive({ useHandCursor: true });
+
+    tutorialBtn.on("pointerover", () => {
+      tutorialBtn.setStyle({ fill: "#ff0" });
+    });
+
+    tutorialBtn.on("pointerout", () => {
+      tutorialBtn.setStyle({ fill: "#fff" });
+    });
+
+    tutorialBtn.on("pointerdown", () => {
+      console.log("Tutorial button clicked");
+      this.scene.start("tutorial");
+    });
 
     level1.on("pointerover", () => {
       level1.setStyle({ fill: "#ff0" });
@@ -151,7 +184,6 @@ export class LevelSelect extends Phaser.Scene {
 
     level1.on("pointerdown", () => {
       console.log("Level 1 button clicked");
-      // Switch scenes here
       this.scene.start("game", { level : "level1" });
     });
 
@@ -165,7 +197,6 @@ export class LevelSelect extends Phaser.Scene {
 
     level2.on("pointerdown", () => {
       console.log("Level 2 button clicked");
-      // Switch scenes here
       this.scene.start("game", { level : "level2" });
     });
 
@@ -179,7 +210,6 @@ export class LevelSelect extends Phaser.Scene {
 
     level3.on("pointerdown", () => {
       console.log("Level 3 button clicked");
-      // Switch scenes here
       this.scene.start("game", { level : "level3" });
     });
 
@@ -193,7 +223,6 @@ export class LevelSelect extends Phaser.Scene {
 
     backButton.on("pointerdown", () => {
       console.log("Back button clicked");
-      // Switch scenes here
       this.scene.start("menu");
     });
 

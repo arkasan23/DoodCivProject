@@ -76,7 +76,7 @@ export class Menu extends Phaser.Scene {
 
     this.menu.add(soundButton);
 
-    let title = this.add.text(-500, centerY - 200, "Placeholder game title", {
+    let title = this.add.text(-500, centerY - 200, "CIV 0", {
       fontFamily: '"JetBrains Mono", monospace',
       fontSize: "48px",
       color: "#ffffff",
