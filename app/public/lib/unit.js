@@ -80,16 +80,6 @@ export default class Unit {
     const scene = this.scene;
 
     this.sprite.on("dragstart", async () => {
-      await fetch(`/get_unit_id?r_pos=${this.r}&q_pos=${this.q}`)
-      .then(async (res) => await res.json())
-      .then((data) => {
-        this.id_num = data.id;
-      });
-      await fetch(`/get_moves_left?id=${this.id_num}`)
-      .then(async (res) => await res.json())
-      .then((data) => {
-        this.movesLeft = data.moves_left;
-      });
       if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 

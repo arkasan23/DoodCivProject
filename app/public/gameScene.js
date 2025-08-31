@@ -361,6 +361,7 @@ export class GameScene extends Phaser.Scene {
       await this.loadTurnState(level);
       await this.loadTiles(level); 
       await this.loadUnitDataFromDB(); 
+      await this.loadUnitMoves();
     });
 
     saveBtn.on('pointerover', () => {
@@ -495,8 +496,10 @@ export class GameScene extends Phaser.Scene {
   
       for (let unitData of unitsData) {
         const unit = new this.Unit(this, unitData.q_pos, unitData.r_pos, unitData.unit_type, unitData.owned_by);
-        unit.id = unitData.id;
+        unit.id_num = unitData.id;
+        unit.id = unitData.unit_type;
         unit.sprite.unitId = unitData.id;
+        unit.movesLeft = unitData.moves_left;
       
         const tile = this.tiles.get(`${unit.q_pos},${unit.r_pos}`);
         if (tile) {
@@ -517,11 +520,13 @@ export class GameScene extends Phaser.Scene {
             return;
           }
           if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
-            this.combat(this.selectedUnit.id, unit.id);
+            this.combat(this.selectedUnit.id, unit.id_num);
             this.selectedUnit = null;
           }
         });
-      
+        if (unit.movesLeft <= 0) {
+          unit.sprite.setTint(0x888888);
+        }
         this.units.push(unit);
       }
   
@@ -667,8 +672,8 @@ export class GameScene extends Phaser.Scene {
 
   saveTiles(level) {
     const tilesData = Array.from(this.tiles.values()).map(tile => ({
-      r: tile.r,
       q: tile.q,
+      r: tile.r,
       color: tile.baseColor,
       owner: tile.owner || null,
     }));
@@ -700,7 +705,7 @@ export class GameScene extends Phaser.Scene {
           };
   
           for (const tileData of data.tiles) {
-            const key = `,${tileData.r},${tileData.q}`;
+            const key = `${tileData.q},${tileData.r}`;
             const tile = this.tiles.get(key);
             if (tile) {
               tile.setColor(parseInt(tileData.color));
@@ -713,5 +718,27 @@ export class GameScene extends Phaser.Scene {
           console.error("Failed to load tiles:", data.error);
         }
       });
+  }
+
+  loadUnitMoves() {
+    fetch("http://localhost:3000/get_units_state")
+    .then(res => res.json())
+    .then(async(data) => {
+      for (const unit of data) {
+        await fetch(`/get_unit_id?r_pos=${unit.r_pos}&q_pos=${unit.q_pos}`)
+        .then(async (res) => await res.json())
+        .then((data) => {
+          unit.id_num = data.id;
+        });
+        await fetch(`/get_moves_left?id=${unit.id_num}`)
+        .then(async (res) => await res.json())
+        .then((data) => {
+          unit.movesLeft = data.moves_left;
+        });
+      }
+      if (unit.movesLeft <= 0) {
+          this.sprite.setTint(0x888888);
+        }
+    })
   }
 }

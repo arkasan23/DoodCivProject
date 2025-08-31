@@ -292,13 +292,6 @@ app.get("/update_unit_pos", async (req, res) => {
   return res.send();
 })
 
-app.get("/get_unit_id", async (req, res) => {
-  const r_pos = req.query.r_pos;
-  const q_pos = req.query.q_pos;
-  const unit = await pool.query(`SELECT id FROM units_state WHERE r_pos = $1 AND q_pos = $2`, [r_pos, q_pos]);
-  return res.json(unit.rows[0]);
-})
-
 app.get("/get_moves_left", async (req, res) => {
   try {
     const id = req.query.id;
