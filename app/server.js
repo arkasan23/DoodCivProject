@@ -299,6 +299,28 @@ app.get("/get_unit_id", async (req, res) => {
   return res.json(unit.rows[0]);
 })
 
+app.get("/get_moves_left", async (req, res) => {
+  try {
+    const id = req.query.id;
+    const result = await pool.query("SELECT moves_left FROM units_state WHERE id = $1", [id]);
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send("Error getting moves left.");
+  }
+});
+
+app.put("/set_moves_left", async (req, res) => {
+  try {
+    const { id, moves_left } = req.body;
+    await pool.query("UPDATE units_state SET moves_left = $1 WHERE id = $2", [moves_left, id]);
+    res.send();
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send("Error setting moves left.");
+  }
+});
+
 app.listen(port, hostname, () => {
   console.log(`Listening at: http://${hostname}:${port}`);
 });

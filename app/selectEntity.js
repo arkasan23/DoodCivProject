@@ -30,8 +30,8 @@ class SelectEntity {
     // unit: A JSON containing: id, unit_type, current_health
     // pos: the position the unit will be on
     async initiateUnit(unit, q_pos, r_pos, player) {
-        let command = `INSERT INTO units_state (unit_type, current_health, owned_by, q_pos, r_pos, can_move) VALUES ($1, $2, $3, $4, $5, $6)`;
-        await this.pool.query(command, [unit.name, unit.health, player, q_pos, r_pos, true]);
+        let command = `INSERT INTO units_state (unit_type, current_health, owned_by, q_pos, r_pos, can_move, moves_left) VALUES ($1, $2, $3, $4, $5, $6, $7)`;
+        await this.pool.query(command, [unit.name, unit.health, player, q_pos, r_pos, true, unit.move_range]);
     }
 
     // renamed putUnit and changed it since the below function was identical 

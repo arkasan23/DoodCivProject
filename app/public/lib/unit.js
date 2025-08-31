@@ -79,7 +79,17 @@ export default class Unit {
   registerDragEvents() {
     const scene = this.scene;
 
-    this.sprite.on("dragstart", () => {
+    this.sprite.on("dragstart", async () => {
+      await fetch(`/get_unit_id?r_pos=${this.r}&q_pos=${this.q}`)
+      .then(async (res) => await res.json())
+      .then((data) => {
+        this.id_num = data.id;
+      });
+      await fetch(`/get_moves_left?id=${this.id_num}`)
+      .then(async (res) => await res.json())
+      .then((data) => {
+        this.movesLeft = data.moves_left;
+      });
       if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 
@@ -87,7 +97,7 @@ export default class Unit {
       this.highlightReachableTiles();
     });
 
-    this.sprite.on("drag", (_pointer, dragX, dragY) => {
+    this.sprite.on("drag", async(_pointer, dragX, dragY) => {
       if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 
@@ -132,6 +142,7 @@ export default class Unit {
         this.attack(enemy);
 
         this.movesLeft = 0;
+        this.updateMovesLeft();
         this.sprite.setTint(0x888888);
         return;
       }
@@ -148,6 +159,7 @@ export default class Unit {
         await fetch(`http://localhost:3000/update_unit_pos?id=${this.id_num}&r_pos=${this.r}&q_pos=${this.q}`); // Update unit position in units_state
         this.movesLeft--;
         //this.moved = true;
+        this.updateMovesLeft();
         if (this.movesLeft <= 0) {
           this.sprite.setTint(0x888888);
         }
@@ -231,6 +243,7 @@ export default class Unit {
 
   incrementTurn() {
     this.movesLeft = this.movementRange;
+    this.updateMovesLeft();
     //  this.moved = false;
     this.sprite.clearTint();
     //  this.updateTint();
@@ -420,5 +433,13 @@ export default class Unit {
       this.boundTile.unit = null;
     }
     this.sprite.destroy();
+  }
+
+  async updateMovesLeft() {
+    await fetch("http://localhost:3000/set_moves_left", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: this.id_num, moves_left: this.movesLeft }),
+        });
   }
 }
