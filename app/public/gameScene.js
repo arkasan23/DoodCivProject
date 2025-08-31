@@ -475,7 +475,7 @@ export class GameScene extends Phaser.Scene {
     const current = this.currentPlayer();
     const next = this.nextPlayer();
     await fetch(`/get_gold?player=${encodeURIComponent("Player 1")}`)
-      .then((res) => res.json())
+      .then(async (res) => await res.json())
       .then((data) => {
         this.playerGold = data.gold;
       });

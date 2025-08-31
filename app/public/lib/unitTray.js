@@ -95,7 +95,7 @@ export default class UnitTray {
       }
     });
 
-    this.sprite.on("drop", (pointer) => {
+    this.sprite.on("drop", async (pointer) => {
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
 
@@ -124,6 +124,13 @@ export default class UnitTray {
         unit.sprite.setName("unit-" + unit.id);
 
         this.scene.playerGold -= this.cost;
+
+        await fetch("http://localhost:3000/set_gold", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "Player 1", gold: this.scene.playerGold }),
+        });
+
         console.log(
           `Player ${this.ownerIndex} bought ${this.id || this.textureKey} for ${this.cost} gold`,
         );

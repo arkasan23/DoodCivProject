@@ -55,9 +55,8 @@ export default class Unit {
       `http://localhost:3000/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`,
     );
     const data = await fetch(`http://localhost:3000/get_unit_id?q_pos=${this.q}&r_pos=${this.r}`);
-    const unit_id = await data.json();
-    console.log(unit_id);
-    this.id_num = unit_id.id;
+    const { id } = await data.json();
+    this.id_num = id;
   }
 
   async initUnit() {
