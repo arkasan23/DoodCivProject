@@ -100,9 +100,9 @@ class SelectEntity {
 
     // Updates unit map position in units_state
     // Should be called when unit moves
-    async updateUnitPos(id, q_pos, r_pos) {
-        let command = `UPDATE units_state SET q_pos = $1, r_pos = $2 WHERE id = $3`;
-        await pool.query(command, [q_pos, r_pos, id]);
+    async updateUnitPos(id, r_pos, q_pos) {
+        let command = `UPDATE units_state SET r_pos = $1, q_pos = $2 WHERE id = $3`;
+        await pool.query(command, [r_pos, q_pos, id]);
     }
 
     // id: id of the unit

@@ -667,8 +667,8 @@ export class GameScene extends Phaser.Scene {
 
   saveTiles(level) {
     const tilesData = Array.from(this.tiles.values()).map(tile => ({
-      q: tile.q,
       r: tile.r,
+      q: tile.q,
       color: tile.baseColor,
       owner: tile.owner || null,
     }));
@@ -700,7 +700,7 @@ export class GameScene extends Phaser.Scene {
           };
   
           for (const tileData of data.tiles) {
-            const key = `${tileData.q},${tileData.r}`;
+            const key = `,${tileData.r},${tileData.q}`;
             const tile = this.tiles.get(key);
             if (tile) {
               tile.setColor(parseInt(tileData.color));

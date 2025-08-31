@@ -139,6 +139,8 @@ export default class EnemyAI {
             unitType,
           );
 
+          //await fetch(`http://localhost:3000/initiate_unit?unitName=${unitType}&q_pos=${spawnTile.q}&r_pos=${spawnTile.r}&player=${this.name}`);
+
           spawnTile.unit = newUnit;
           newUnit.boundTile = spawnTile;
           newUnit.moveToTile(spawnTile);

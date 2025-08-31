@@ -58,8 +58,7 @@ app.get("/get_unit_state", async (req, res) => {
   }
 });
 
-// for when a new unit is bought
-// TODO: check this 
+// for when a new unit is bought 
 app.get("/initiate_unit", async (req, res) => {
   try {
     const unitName = req.query.unitName;
@@ -284,6 +283,21 @@ app.get("/load_tiles", (req, res) => {
     res.status(500).json({ error: "Failed to load tiles" });
   }
 });
+
+app.get("/update_unit_pos", async (req, res) => {
+  const id = req.query.id;
+  const r_pos = req.query.r_pos;
+  const q_pos = req.query.q_pos;
+  await selectEntity.updateUnitPos(id, r_pos, q_pos);
+  return res.send();
+})
+
+app.get("/get_unit_id", async (req, res) => {
+  const r_pos = req.query.r_pos;
+  const q_pos = req.query.q_pos;
+  const unit = await pool.query(`SELECT id FROM units_state WHERE r_pos = $1 AND q_pos = $2`, [r_pos, q_pos]);
+  return res.json(unit.rows[0]);
+})
 
 app.listen(port, hostname, () => {
   console.log(`Listening at: http://${hostname}:${port}`);

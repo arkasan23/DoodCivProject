@@ -54,6 +54,10 @@ export default class Unit {
     await fetch(
       `http://localhost:3000/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`,
     );
+    const data = await fetch(`http://localhost:3000/get_unit_id?q_pos=${this.q}&r_pos=${this.r}`);
+    const unit_id = await data.json();
+    console.log(unit_id);
+    this.id_num = unit_id.id;
   }
 
   async initUnit() {
@@ -107,7 +111,7 @@ export default class Unit {
       }
     });
 
-    this.sprite.on("drop", (_pointer, dropZone) => {
+    this.sprite.on("drop", async (_pointer, dropZone) => {
       if (this.owner !== "Player 1") return;
       if (this.movesLeft <= 0) return;
 
@@ -142,6 +146,7 @@ export default class Unit {
         if (this.boundTile) this.boundTile.unit = null;
         this.resetPosition();
         this.moveToTile(tile);
+        await fetch(`http://localhost:3000/update_unit_pos?id=${this.id_num}&r_pos=${this.r}&q_pos=${this.q}`); // Update unit position in units_state
         this.movesLeft--;
         //this.moved = true;
         if (this.movesLeft <= 0) {
