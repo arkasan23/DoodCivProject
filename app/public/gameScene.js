@@ -361,7 +361,6 @@ export class GameScene extends Phaser.Scene {
       await this.loadTurnState(level);
       await this.loadTiles(level); 
       await this.loadUnitDataFromDB(); 
-      await this.loadUnitMoves();
     });
 
     saveBtn.on('pointerover', () => {
@@ -718,27 +717,5 @@ export class GameScene extends Phaser.Scene {
           console.error("Failed to load tiles:", data.error);
         }
       });
-  }
-
-  loadUnitMoves() {
-    fetch("http://localhost:3000/get_units_state")
-    .then(res => res.json())
-    .then(async(data) => {
-      for (const unit of data) {
-        await fetch(`/get_unit_id?r_pos=${unit.r_pos}&q_pos=${unit.q_pos}`)
-        .then(async (res) => await res.json())
-        .then((data) => {
-          unit.id_num = data.id;
-        });
-        await fetch(`/get_moves_left?id=${unit.id_num}`)
-        .then(async (res) => await res.json())
-        .then((data) => {
-          unit.movesLeft = data.moves_left;
-        });
-      }
-      if (unit.movesLeft <= 0) {
-          this.sprite.setTint(0x888888);
-        }
-    })
   }
 }
