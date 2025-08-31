@@ -251,14 +251,14 @@ export class GameScene extends Phaser.Scene {
   checkWinLose() {
     const allTiles = Array.from(this.tiles.values());
 
-    const allPlayer = allTiles.every((tile) => tile.owner === "Player 1");
-    const allEnemy = allTiles.every(
+    const allPlayer = allTiles.filter((tile) => tile.owner === "Player 1").length;
+    const allEnemy = allTiles.filter(
       (tile) => tile.owner && tile.owner.startsWith("AI"),
-    );
+    ).length;
 
-    if (allPlayer) {
+    if (allEnemy === 0) {
       this.showEndScreen("win");
-    } else if (allEnemy) {
+    } else if (allPlayer === 0) {
       this.showEndScreen("lose");
     }
   }
