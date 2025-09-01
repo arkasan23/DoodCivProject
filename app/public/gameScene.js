@@ -291,6 +291,9 @@ export class GameScene extends Phaser.Scene {
 
     this.renderTurnHud();
     this.checkWinLose();
+    // persist to Supabase
+    await this.saveTurnState(this.level);
+    await this.saveTiles(this.level);
   }
 
   createBackButton() {
@@ -480,54 +483,57 @@ export class GameScene extends Phaser.Scene {
   }
 
   async loadUnitDataFromDB() {
-    try {
-      const res = await fetch(`/get_all_units`);
-      const unitsData = await res.json();
-  
-      // Clear any existing units first
-      this.units.forEach((unit) => unit.sprite.destroy());
-      this.units = [];
-  
-      for (let unitData of unitsData) {
-        const unit = new this.Unit(this, unitData.q_pos, unitData.r_pos, unitData.unit_type, unitData.owned_by);
-        unit.id_num = unitData.id;
-        unit.id = unitData.unit_type;
-        unit.sprite.unitId = unitData.id;
-        unit.movesLeft = unitData.moves_left;
-      
-        const tile = this.tiles.get(`${unit.q_pos},${unit.r_pos}`);
-        if (tile) {
-          tile.unit = unit;
-          unit.boundTile = tile;
-          unit.sprite.x = tile.x;
-          unit.sprite.y = tile.y;
-          unit.startX = tile.x;
-          unit.startY = tile.y;
-        }
-      
-        unit.sprite.setInteractive();
-        unit.sprite.on("pointerdown", () => {
-          if (!this.selectedUnit) {
-            if (unit.owner === "Player 1") {
-              this.selectedUnit = unit;
-            }
-            return;
-          }
-          if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
-            this.combat(this.selectedUnit.id, unit.id_num);
-            this.selectedUnit = null;
-          }
-        });
-        if (unit.movesLeft <= 0) {
-          unit.sprite.setTint(0x888888);
-        }
-        this.units.push(unit);
+  try {
+    // Read units_state from Supabase
+    const { data, error } = await supabase
+      .from("units_state")
+      .select("id, unit_type, current_health, owned_by, q_pos, r_pos, moves_left"); // add moves_left column in DB if you use it
+
+    if (error) throw error;
+
+    // Clear any existing units first
+    this.units.forEach((u) => u.sprite.destroy());
+    this.units = [];
+
+    for (const row of data) {
+      const unit = new this.Unit(this, row.q_pos, row.r_pos, row.unit_type, row.owned_by);
+      unit.id_num = row.id;
+      unit.id = row.unit_type;       // your code uses string id for combat lookups
+      unit.sprite.unitId = row.id;
+      unit.movesLeft = row.moves_left ?? 1;
+
+      const tile = this.tiles.get(`${row.q_pos},${row.r_pos}`);
+      if (tile) {
+        tile.unit = unit;
+        unit.boundTile = tile;
+        unit.sprite.x = tile.x;
+        unit.sprite.y = tile.y;
+        unit.startX = tile.x;
+        unit.startY = tile.y;
       }
-  
-    } catch (error) {
-      console.error("Error loading units from Database:", error);
+
+      unit.sprite.setInteractive();
+      unit.sprite.on("pointerdown", () => {
+        if (!this.selectedUnit) {
+          if (unit.owner === "Player 1") {
+            this.selectedUnit = unit;
+          }
+          return;
+        }
+        if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
+          this.combat(this.selectedUnit.id, unit.id_num);
+          this.selectedUnit = null;
+        }
+      });
+
+      if (unit.movesLeft <= 0) unit.sprite.setTint(0x888888);
+      this.units.push(unit);
     }
+  } catch (error) {
+    console.error("Error loading units from Supabase:", error);
   }
+}
+
 
   async checkUnitRange(attackerId, victimId) {
     try {
@@ -629,91 +635,86 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  saveTurnState(level) {
-    fetch("http://localhost:3000/save_turn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        level,
-        turn: this.turnIndex,
-        round: this.round
-      }),
-    })
-    .then(res => res.json())
-    .then(result => {
-      if (result.success) {
-        console.log("Turn state saved!");
-      } else {
-        console.error("Failed to save turn state:", result.error);
-      }
-    });
-  }
   
-  loadTurnState(level) {
-    return fetch(`http://localhost:3000/load_turn?level=${level}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          this.turnIndex = data.turn;
-          this.round = data.round;
-          this.renderTurnHud();  // ✅ Call it here always
-          console.log("Turn state loaded.");
-        } else {
-          console.error("Failed to load turn state:", data.error);
-        }
-      });
+  saveTurnState(level) {
+    return supabase.from("turn_state").upsert({
+    level,
+    round: this.round,
+    turn: this.turnIndex,
+    gold: this.playerGold,
+    updated_at: new Date().toISOString()
+  }).then(({ error }) => {
+    if (error) console.error("saveTurnState error", error);
+    else console.log("Turn state saved!");
+  });
+}
+
+
+  async loadTurnState(level) {
+    const { data, error } = await supabase
+    .from("turn_state")
+    .select("round, turn, gold")
+    .eq("level", level)
+    .single();
+
+  if (error && error.code !== "PGRST116") { // not-found is fine
+    console.error("loadTurnState error", error);
+    return;
   }
 
+  if (data) {
+    this.round = data.round;
+    this.turnIndex = data.turn;
+    this.playerGold = data.gold;
+  } else {
+    // seed default row
+    await supabase.from("turn_state").insert({ level, round: 1, turn: 0, gold: this.playerGold });
+  }
+
+  this.renderTurnHud();
+ }
+
+ 
   saveTiles(level) {
-    const tilesData = Array.from(this.tiles.values()).map(tile => ({
-      q: tile.q,
-      r: tile.r,
-      color: tile.baseColor,
-      owner: tile.owner || null,
-    }));
-  
-    fetch("http://localhost:3000/save_tiles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level, tiles: tilesData }),
-    })
-    .then(res => res.json())
-    .then(result => {
-      if (result.success) {
-        console.log("Tiles saved!");
-      } else {
-        console.error("Failed to save tiles:", result.error);
-      }
+    const rows = Array.from(this.tiles.values()).map(t => ({
+    level,
+    q: t.q,
+    r: t.r,
+    color: t.baseColor,        // already a number
+    owner: t.owner || null,
+    updated_at: new Date().toISOString()
+  }));
+
+  // upsert in chunks if you prefer; this is fine for small maps
+  supabase.from("tiles_state").upsert(rows, { onConflict: "level,q,r" })
+    .then(({ error }) => {
+      if (error) console.error("saveTiles error", error);
+      else console.log("Tiles saved!");
     });
-  }
-  
-  loadTiles(level) {
-    fetch(`http://localhost:3000/load_tiles?level=${level}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const playerColors = {
-            "Player 1": 0x3377cc,
-            "AI 1": 0xd2042d,
-            "AI 2": 0xcc3333,
-          };
-  
-          for (const tileData of data.tiles) {
-            const key = `${tileData.q},${tileData.r}`;
-            const tile = this.tiles.get(key);
-            if (tile) {
-              tile.setColor(parseInt(tileData.color));
-              tile.setOwner(tileData.owner || null);
-            }
-          }
-  
-          console.log("Tiles loaded.");
-        } else {
-          console.error("Failed to load tiles:", data.error);
-        }
-      });
-  }
 }
+
+
+  async loadTiles(level) {
+    const { data, error } = await supabase
+    .from("tiles_state")
+    .select("q, r, color, owner")
+    .eq("level", level);
+
+  if (error) {
+    console.error("loadTiles error", error);
+    return;
+  }
+
+  for (const row of data) {
+    const key = `${row.q},${row.r}`;
+    const tile = this.tiles.get(key);
+    if (!tile) continue;
+    tile.setColor(Number(row.color));
+    tile.setOwner(row.owner || null);
+  }
+  console.log("Tiles loaded.");
+}
+
 
 /* ========== Supabase helpers (outside the class) ========== */
 
