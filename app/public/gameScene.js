@@ -70,6 +70,7 @@ export class GameScene extends Phaser.Scene {
     this.load.json("level2", "assets/levels/level2.json");
     this.load.json("level3", "assets/levels/level3.json");
 
+    // icons used by the UnitProgression sidebar
     this.load.image("scout", "assets/scout.png");
     this.load.image("warrior", "assets/warrior.png");
     this.load.image("knight", "assets/knight.png");
@@ -85,9 +86,9 @@ export class GameScene extends Phaser.Scene {
   async create() {
     const levelData = this.cache.json.get(this.level);
 
-    // Reset players and units_state table
+    // Reset players and units_state table (your local API)
     await fetch("http://localhost:3000/clear_table?name=players");
-    await fetch("http://localhost:3000/clear_table?name=units_state")
+    await fetch("http://localhost:3000/clear_table?name=units_state");
 
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
       const aiName = "AI " + i;
@@ -105,39 +106,33 @@ export class GameScene extends Phaser.Scene {
     }
 
     // ===== UNIT PROGRESSION HUD (LEFT PANEL) =====
-    // Tiers are easy to tweak; icons use your existing PNGs in /assets
-    const units = [
+    // Pull catalog from Supabase; fall back to a safe local list if needed.
+    const unitCatalog = await fetchUnitsFromSupabase();
+
+    const fallbackUnits = [
       // Tier 1
       { id: "warrior", name: "Warrior", tier: 1, iconKey: "warrior" },
       { id: "slinger", name: "Slinger", tier: 1, iconKey: "slinger" },
       { id: "scout", name: "Scout", tier: 1, iconKey: "scout" },
-
       // Tier 2
       { id: "archer", name: "Archer", tier: 2, iconKey: "archer" },
       { id: "swordsman", name: "Swordsman", tier: 2, iconKey: "swordsman" },
       { id: "horseman", name: "Horseman", tier: 2, iconKey: "horseman" },
-
       // Tier 3
       { id: "knight", name: "Knight", tier: 3, iconKey: "knight" },
       { id: "chariot", name: "Chariot", tier: 3, iconKey: "chariot" },
       { id: "lancer", name: "Lancer", tier: 3, iconKey: "lancer" },
-
       // Tier 4
       { id: "musketeer", name: "Musketeer", tier: 4, iconKey: "musketeer" },
     ];
 
     this.unitUI = new UnitProgression(this, {
-      units,
+      units: unitCatalog.length ? unitCatalog : fallbackUnits,
       turnsPerTier: 5, // unlock next tier every 5 rounds
       onTierUnlock: (tier) => {
-        // optional: toast/SFX/etc.
         console.log(`Unlocked Tier ${tier}`);
       },
     });
-
-    // If you don’t have a global TurnManager emitting "turn:changed",
-    // call this when your round changes:
-    // this.unitUI.applyRound(this.round);
 
     // Keep panel sized on resize (UnitProgression also listens, but safe)
     this.scale.on("resize", (size) => {
@@ -719,3 +714,40 @@ export class GameScene extends Phaser.Scene {
       });
   }
 }
+
+/* ========== Supabase helpers (outside the class) ========== */
+
+/**
+ * Fetch unit catalog from Supabase `units_data`.
+ * Returns [{ id, name, tier, iconKey }]
+ */
+async function fetchUnitsFromSupabase() {
+  try {
+    if (!window.supabase) {
+      console.warn("Supabase client not found on window; using fallback units.");
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("units_data")
+      .select("name,tier")
+      .order("tier")
+      .order("name");
+
+    if (error) {
+      console.error("supabase units_data error:", error);
+      return [];
+    }
+
+    return (data || []).map((u) => ({
+      id: u.name,
+      name: u.name.charAt(0).toUpperCase() + u.name.slice(1),
+      tier: u.tier ?? 1,
+      iconKey: u.name, // matches your preloaded asset keys
+    }));
+  } catch (e) {
+    console.error("fetchUnitsFromSupabase error:", e);
+    return [];
+  }
+}
+
