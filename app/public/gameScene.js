@@ -5,7 +5,7 @@ import EnemyAI from "./lib/enemyAI.js";
 import UnitProgression from "./UnitProgression.js";
 import { supabase } from "./supabaseClient.js";
 
-// ---- single helper (hoisted) ----
+// helper function for supanbase
 function fetchUnitsFromSupabase() {
   return supabase
     .from("units_data")
