@@ -204,6 +204,8 @@ export class GameScene extends Phaser.Scene {
     // ========== HUD ==========
     say('create HUD');
     this.createTurnHud();
+    this.turnText.setText(`Round: ${this.round}`);
+    this.goldText.setText(`Gold: ${this.playerGold}`);
 
     // Persistent state (guard Supabase failures so we still render)
     say('load persisted turn & tiles (guarded)');

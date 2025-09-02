@@ -101,32 +101,41 @@ export default class unitProgression {
     this._layout(size.width, size.height);
   }
 
-  _buildUI() {
-    const { width, height } = this.scene.scale;
+ _buildUI() {
+  const { width, height } = this.scene.scale;
 
-    this.bg = this.scene.add
-      .rectangle(0, 0, this.panelWidth, height, 0x111522, 0.85)
-      .setOrigin(0, 0)
-      .setDepth(1000)
-      .setScrollFactor(0);
+  this.bg = this.scene.add
+    .rectangle(0, 0, this.panelWidth, height, 0x111522, 0.85)
+    .setOrigin(0, 0)
+    .setDepth(2000)       // higher than tiles/hud
+    .setScrollFactor(0);
 
-    this.title = this.scene.add
-      .text(16, 10, "Units", {
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: "20px",
-        color: "#ffffff",
-      })
-      .setDepth(1001)
-      .setScrollFactor(0);
+  this.title = this.scene.add
+    .text(16, 12, "Units", {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: "20px",
+      color: "#ffffff",
+    })
+    .setDepth(2001)
+    .setScrollFactor(0);
 
-    this.list = this.scene.add
-      .container(0, 40)
-      .setDepth(1001)
-      .setScrollFactor(0);
+  this.list = this.scene.add
+    .container(0, 40)
+    .setDepth(2001)
+    .setScrollFactor(0);
 
-    this._rebuildRows();
-    this._layout(width, height);
-  }
+  this._rebuildRows();
+  this._layout(width, height);
+}
+
+_layout(w, h) {
+  // Always (re)position everything; don’t assume previous values.
+  this.bg?.setSize(this.panelWidth, h);
+  this.bg?.setPosition(0, 0);
+
+  this.title?.setPosition(16, 12);
+  this.list?.setPosition(0, 40);
+}
 
 // --- replace your current _rebuildRows with this ---
 _rebuildRows() {
@@ -167,6 +176,16 @@ _rebuildRows() {
         color: "#ffffff",
       }
     );
+    const key = u.iconKey;
+    if (!this.scene.textures.exists(key)) {
+       console.warn("[UnitProgression] Tray sprite missing for", u);
+       // draw a tiny placeholder rect so you can still click
+       const placeholder = this.scene.add.rectangle(36, 30, 28, 28, 0x666666).setOrigin(0.5);
+       row.add(placeholder);
+     } else {
+        row.add(tray.sprite);   // normal flow 
+     }
+     row.add([label, lockOverlay, underline]);
 
     // If UnitTray asynchronously learns the cost, let it update the label
     tray.onCostLoaded = (cost) => {
