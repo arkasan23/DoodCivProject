@@ -118,39 +118,46 @@ export class GameScene extends Phaser.Scene {
   }
 
   async create() {
+  // --- ultra-simple on-screen logger so blue screens still tell us something ---
+  const dbg = this.add.text(12, 8, 'GameScene.create(): start', {
+    fontFamily: '"JetBrains Mono", monospace',
+    fontSize: '14px',
+    color: '#fff'
+  }).setDepth(5000).setScrollFactor(0);
+
+  const say = (m) => { console.log(m); dbg.setText(m); };
+
+  try {
+    say('load level json from cache');
     const levelData = this.cache.json.get(this.level);
 
-    // ====== PLAYERS (clear + insert) via Supabase ======
-    await supabase.from("players").delete().neq("id", 0);
-    for (let i = 1; i < levelData.num_enemies + 1; i++) {
-      const aiName = "AI " + i;
-      this.players.push(aiName);
-      this.AIs.push(new EnemyAI(this, aiName));
+    if (!levelData) {
+      // If for some reason the json wasn't in cache, try to (re)queue it and wait.
+      say(`level "${this.level}" not in cache — trying to (re)load`);
+      this.load.json("level1", "assets/levels/level1.json");
+      this.load.json("level2", "assets/levels/level2.json");
+      this.load.json("level3", "assets/levels/level3.json");
+      await new Promise((res) => this.load.once(Phaser.Loader.Events.COMPLETE, res));
+      this.load.start();
     }
-    await supabase.from("players").insert(this.players.map((name) => ({ name })));
 
-    // ===== UNIT PROGRESSION HUD (LEFT PANEL) =====
-    const unitCatalog = await fetchUnitsFromSupabase();
-    const fallbackUnits = [
-      { id: "warrior", name: "Warrior", tier: 1, iconKey: "warrior" },
-      { id: "slinger", name: "Slinger", tier: 1, iconKey: "slinger" },
-      { id: "scout", name: "Scout", tier: 1, iconKey: "scout" },
-      { id: "archer", name: "Archer", tier: 2, iconKey: "archer" },
-      { id: "swordsman", name: "Swordsman", tier: 2, iconKey: "swordsman" },
-      { id: "horseman", name: "Horseman", tier: 2, iconKey: "horseman" },
-      { id: "knight", name: "Knight", tier: 3, iconKey: "knight" },
-      { id: "chariot", name: "Chariot", tier: 3, iconKey: "chariot" },
-      { id: "lancer", name: "Lancer", tier: 3, iconKey: "lancer" },
-      { id: "musketeer", name: "Musketeer", tier: 4, iconKey: "musketeer" },
-    ];
+    // ========== PLAYERS ==========
+    say('seed players (Supabase guarded)');
+    try {
+      await supabase.from("players").delete().neq("id", 0);
+      // Build AI list before inserting rows
+      for (let i = 1; i < levelData.num_enemies + 1; i++) {
+        const aiName = "AI " + i;
+        this.players.push(aiName);
+        this.AIs.push(new EnemyAI(this, aiName));
+      }
+      await supabase.from("players").insert(this.players.map((name) => ({ name })));
+    } catch (e) {
+      console.warn('[players] ignoring error:', e);
+    }
 
-    this.unitUI = new UnitProgression(this, {
-      units: unitCatalog.length ? unitCatalog : fallbackUnits,
-      turnsPerTier: 5,
-      onTierUnlock: (tier) => console.log(`Unlocked Tier ${tier}`),
-    });
-
-    // ===== GRID =====
+    // ========== GRID ==========
+    say('build hex grid');
     const radius = 30;
     const hexWidth = Math.sqrt(3) * radius;
     const hexHeight = 2 * radius;
@@ -170,6 +177,8 @@ export class GameScene extends Phaser.Scene {
       "AI 2": 0xcc3333,
     };
 
+    this.tiles = new Map();
+
     for (const tileData of levelData.tiles) {
       const { q, r, color } = tileData;
       const tileColor = parseInt(color);
@@ -181,9 +190,9 @@ export class GameScene extends Phaser.Scene {
           break;
         }
       }
-
       this.tiles.set(`${q},${r}`, tile);
 
+      // drop zone (safe but not required for drawing)
       const dz = this.add
         .zone(tile.x, tile.y, hexWidth * 0.9, hexHeight * 0.9)
         .setRectangleDropZone(hexWidth * 0.9, hexHeight * 0.9);
@@ -192,19 +201,62 @@ export class GameScene extends Phaser.Scene {
 
     this.input.setTopOnly(true);
 
-    // ===== HUD =====
+    // ========== HUD ==========
+    say('create HUD');
     this.createTurnHud();
 
-    // Load persisted state, then sync unlocks and HUD
-    await this.loadTurnState(this.level);
-    await this.loadTiles(this.level);
-    this.unitUI.applyRound?.(this.round);
-    this.renderTurnHud();
+    // Persistent state (guard Supabase failures so we still render)
+    say('load persisted turn & tiles (guarded)');
+    try { await this.loadTurnState(this.level); } catch (e) { console.warn('loadTurnState', e); }
+    try { await this.loadTiles(this.level); } catch (e) { console.warn('loadTiles', e); }
 
-    // Units
-    await this.loadUnitDataFromDB();
+    // ========== UNIT PROGRESSION PANEL ==========
+    say('build UnitProgression panel');
+    let unitCatalog = [];
+    try {
+      unitCatalog = await (async () => {
+        const { data, error } = await supabase
+          .from("units_data").select("name,tier").order("tier").order("name");
+        if (error) throw error;
+        return (data || []).map(u => ({
+          id: u.name,
+          name: u.name,
+          tier: u.tier ?? 1,
+          // iconKey optional; UnitTray shows placeholder square if missing
+        }));
+      })();
+    } catch (e) {
+      console.warn('[units_data] falling back:', e);
+    }
 
-    // Input
+    const fallbackUnits = [
+      { id: "scout", name: "scout", tier: 1 },
+      { id: "slinger", name: "slinger", tier: 1 },
+      { id: "warrior", name: "warrior", tier: 1 },
+      { id: "archer", name: "archer", tier: 2 },
+      { id: "horseman", name: "horseman", tier: 2 },
+      { id: "swordsman", name: "swordsman", tier: 2 },
+      { id: "chariot", name: "chariot", tier: 3 },
+      { id: "knight", name: "knight", tier: 3 },
+      { id: "lancer", name: "lancer", tier: 3 },
+      { id: "musketeer", name: "musketeer", tier: 4 },
+    ];
+
+    // UnitProgression is robust to missing textures now
+    this.unitUI = new UnitProgression(this, {
+      units: unitCatalog.length ? unitCatalog : fallbackUnits,
+      turnsPerTier: 5,
+      onTierUnlock: (tier) => console.log(`Unlocked Tier ${tier}`),
+    });
+
+    // Apply current round to lock/unlock tiers
+    this.unitUI.applyRound(this.round ?? 1);
+
+    // ========== UNITS FROM DB ==========
+    say('load units_state (guarded)');
+    try { await this.loadUnitDataFromDB(); } catch (e) { console.warn('loadUnitDataFromDB', e); }
+
+    // Keyboard & interactions
     this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
 
     this.scale.on("resize", (size) => {
@@ -223,13 +275,11 @@ export class GameScene extends Phaser.Scene {
 
     this.selectedUnit = null;
 
-    this.units.forEach((unit) => {
+    (this.units || []).forEach((unit) => {
       unit.sprite.setInteractive();
       unit.sprite.on("pointerdown", () => {
         if (!this.selectedUnit) {
-          if (unit.owner === "Player 1") {
-            this.selectedUnit = unit;
-          }
+          if (unit.owner === "Player 1") this.selectedUnit = unit;
           return;
         }
         if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
@@ -242,7 +292,16 @@ export class GameScene extends Phaser.Scene {
     this.createResetButton();
     this.createBackButton();
     this.createSaveLoadButtons();
+
+    say('Game ready ✅');
+    // Remove the debug text once we’re sure the scene is running
+    this.time.delayedCall(800, () => dbg.destroy());
+  } catch (err) {
+    console.error('GameScene.create() failed', err);
+    dbg.setText(`Create failed:\n${(err && err.message) || err}`);
+    // Keep text visible so you can see the exception on GitHub Pages.
   }
+}
 
   shutdown() {
     this.unitUI?.destroy();
