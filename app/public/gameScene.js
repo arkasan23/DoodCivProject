@@ -5,6 +5,7 @@ import EnemyAI from "./lib/enemyAI.js";
 import UnitProgression from "./UnitProgression.js";
 import { supabase } from "./supabaseClient.js";
 
+// ---- single helper (hoisted) ----
 function fetchUnitsFromSupabase() {
   return supabase
     .from("units_data")
@@ -112,9 +113,7 @@ export class GameScene extends Phaser.Scene {
     const levelData = this.cache.json.get(this.level);
 
     // ====== PLAYERS (clear + insert) via Supabase ======
-    // Clear table (dev behavior to match old flow)
     await supabase.from("players").delete().neq("id", 0);
-    // Insert Player 1 + AIs
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
       const aiName = "AI " + i;
       this.players.push(aiName);
@@ -125,19 +124,15 @@ export class GameScene extends Phaser.Scene {
     // ===== UNIT PROGRESSION HUD (LEFT PANEL) =====
     const unitCatalog = await fetchUnitsFromSupabase();
     const fallbackUnits = [
-      // Tier 1
       { id: "warrior", name: "Warrior", tier: 1, iconKey: "warrior" },
       { id: "slinger", name: "Slinger", tier: 1, iconKey: "slinger" },
       { id: "scout", name: "Scout", tier: 1, iconKey: "scout" },
-      // Tier 2
       { id: "archer", name: "Archer", tier: 2, iconKey: "archer" },
       { id: "swordsman", name: "Swordsman", tier: 2, iconKey: "swordsman" },
       { id: "horseman", name: "Horseman", tier: 2, iconKey: "horseman" },
-      // Tier 3
       { id: "knight", name: "Knight", tier: 3, iconKey: "knight" },
       { id: "chariot", name: "Chariot", tier: 3, iconKey: "chariot" },
       { id: "lancer", name: "Lancer", tier: 3, iconKey: "lancer" },
-      // Tier 4
       { id: "musketeer", name: "Musketeer", tier: 4, iconKey: "musketeer" },
     ];
 
@@ -147,9 +142,7 @@ export class GameScene extends Phaser.Scene {
       onTierUnlock: (tier) => console.log(`Unlocked Tier ${tier}`),
     });
 
-    this.scale.on("resize", () => {
-      /* UnitProgression relayouts automatically */
-    });
+    this.scale.on("resize", () => { /* UnitProgression relayouts automatically */ });
 
     // ===== GRID =====
     const radius = 30;
@@ -196,12 +189,10 @@ export class GameScene extends Phaser.Scene {
     // ===== HUD =====
     this.createTurnHud();
 
-    // Load persisted round/turn/gold + tiles from Supabase, then render HUD
     await this.loadTurnState(this.level);
     await this.loadTiles(this.level);
     this.renderTurnHud();
 
-    // Units from Supabase
     await this.loadUnitDataFromDB();
 
     this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
@@ -290,7 +281,6 @@ export class GameScene extends Phaser.Scene {
       const goldGained = ownedTileCount * 5;
       this.playerGold += goldGained;
 
-      // (Optional) if you keep gold per player in `turn_state`, we persist below.
       for (const ai of this.AIs) {
         ai.newTurn();
         ai.takeTurn();
@@ -305,7 +295,6 @@ export class GameScene extends Phaser.Scene {
     this.renderTurnHud();
     this.checkWinLose();
 
-    // Persist to Supabase
     await this.saveTurnState(this.level);
     await this.saveTiles(this.level);
   }
@@ -323,17 +312,12 @@ export class GameScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     backBtn.on("pointerdown", () => {
-      // Clean up units and UI
       this.units.forEach((unit) => unit.sprite?.destroy());
       this.units = [];
-
       this.unitUI?.destroy();
-
-      // Return to Level Select
       this.scene.start("level_select");
     });
 
-    // Keep it responsive on resize
     this.scale.on("resize", (size) => {
       backBtn.setPosition(80, size.height - 40);
     });
@@ -363,15 +347,12 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive();
 
-    // Save all
     saveBtn.on("pointerdown", () => {
       const level = this.level;
       this.saveTurnState(level);
       this.saveTiles(level);
-      // (You can persist units_state here too, once you do moves/writes)
     });
 
-    // Load all
     loadBtn.on("pointerdown", async () => {
       const level = this.level;
       await this.loadTurnState(level);
@@ -383,7 +364,6 @@ export class GameScene extends Phaser.Scene {
       saveBtn.setTint(0xaaaaaa);
       saveBtn.scene.input.setDefaultCursor("pointer");
     });
-
     saveBtn.on("pointerout", () => {
       saveBtn.clearTint();
       saveBtn.scene.input.setDefaultCursor("default");
@@ -393,7 +373,6 @@ export class GameScene extends Phaser.Scene {
       loadBtn.setTint(0xaaaaaa);
       loadBtn.scene.input.setDefaultCursor("pointer");
     });
-
     loadBtn.on("pointerout", () => {
       loadBtn.clearTint();
       loadBtn.scene.input.setDefaultCursor("default");
@@ -493,16 +472,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ===== Supabase-backed loads =====
-
   async loadUnitDataFromDB() {
     try {
       const { data, error } = await supabase
         .from("units_state")
         .select("id, unit_type, current_health, owned_by, q_pos, r_pos, moves_left");
-
       if (error) throw error;
 
-      // Clear any existing units first
       this.units.forEach((u) => u.sprite.destroy());
       this.units = [];
 
@@ -548,9 +524,7 @@ export class GameScene extends Phaser.Scene {
   // (still local endpoints; migrate later if needed)
   async checkUnitRange(attackerId, victimId) {
     try {
-      const res = await fetch(
-        `/detect_units?attackId=${attackerId}&enemyId=${victimId}`,
-      );
+      const res = await fetch(`/detect_units?attackId=${attackerId}&enemyId=${victimId}`);
       return await res.json();
     } catch (error) {
       console.error("Error checking range:", error);
@@ -566,13 +540,8 @@ export class GameScene extends Phaser.Scene {
       if (unit.owner === this.currentPlayer()) return;
       this.targetUnit = unit;
 
-      const inRange = await this.checkUnitRange(
-        this.selectedUnit.id,
-        this.targetUnit.id,
-      );
-      if (inRange) {
-        await this.combat(this.selectedUnit.id, this.targetUnit.id);
-      }
+      const inRange = await this.checkUnitRange(this.selectedUnit.id, this.targetUnit.id);
+      if (inRange) await this.combat(this.selectedUnit.id, this.targetUnit.id);
       this.selectedUnit = null;
       this.targetUnit = null;
     }
@@ -580,9 +549,7 @@ export class GameScene extends Phaser.Scene {
 
   async combat(attackerId, victimId) {
     try {
-      let res = await fetch(
-        `/combat?attackerId=${attackerId}&victimId=${victimId}`,
-      );
+      let res = await fetch(`/combat?attackerId=${attackerId}&victimId=${victimId}`);
       let data = await res.json();
 
       if (data.error) {
@@ -593,9 +560,7 @@ export class GameScene extends Phaser.Scene {
       if (data.victimUpdated && data.victimUpdated.current_health > 0) {
         let victimUnit = this.units.find((unit) => unit.id === victimId);
         if (victimUnit) {
-          console.log(
-            `Victim ${victimId} now has ${data.victimUpdated.current_health} HP`,
-          );
+          console.log(`Victim ${victimId} now has ${data.victimUpdated.current_health} HP`);
         }
       }
 
@@ -612,7 +577,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ===== Supabase persistence for round/tiles =====
-
   saveTurnState(level) {
     return supabase
       .from("turn_state")
@@ -646,9 +610,7 @@ export class GameScene extends Phaser.Scene {
       this.turnIndex = data.turn;
       this.playerGold = data.gold;
     } else {
-      await supabase
-        .from("turn_state")
-        .insert({ level, round: 1, turn: 0, gold: this.playerGold });
+      await supabase.from("turn_state").insert({ level, round: 1, turn: 0, gold: this.playerGold });
     }
   }
 
@@ -690,36 +652,5 @@ export class GameScene extends Phaser.Scene {
       tile.setOwner(row.owner || null);
     }
     console.log("Tiles loaded.");
-  }
-}
-
-/* ========== Supabase helpers (outside the class) ========== */
-
-/**
- * Fetch unit catalog from Supabase `units_data`.
- * Returns [{ id, name, tier, iconKey }]
- */
-async function fetchUnitsFromSupabase() {
-  try {
-    const { data, error } = await supabase
-      .from("units_data")
-      .select("name,tier")
-      .order("tier")
-      .order("name");
-
-    if (error) {
-      console.error("supabase units_data error:", error);
-      return [];
-    }
-
-    return (data || []).map((u) => ({
-      id: u.name,
-      name: u.name.charAt(0).toUpperCase() + u.name.slice(1),
-      tier: u.tier ?? 1,
-      iconKey: u.name, // matches your preloaded asset keys
-    }));
-  } catch (e) {
-    console.error("fetchUnitsFromSupabase error:", e);
-    return [];
   }
 }
