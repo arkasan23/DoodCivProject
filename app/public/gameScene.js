@@ -85,7 +85,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   function fetchUnitsFromSupabase() {
-  return supabase
+     return supabase
     .from("units_data")
     .select("name,tier")
     .order("tier")
