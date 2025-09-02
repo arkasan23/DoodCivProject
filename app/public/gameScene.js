@@ -3,7 +3,7 @@ import Unit from "./lib/unit.js";
 import EnemyAI from "./lib/enemyAI.js";
 import UnitProgression from "./UnitProgression.js";
 import { supabase } from "./supabaseClient.js";
-import UnitTray from "./lib/unitTray.js";
+import unitTray from "./lib/unitTray.js";
 
 // Helper: fetch the catalog from Supabase (falls back to local list if needed)
 function fetchUnitsFromSupabase() {
