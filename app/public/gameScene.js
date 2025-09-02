@@ -84,6 +84,30 @@ export class GameScene extends Phaser.Scene {
     this.load.image("musketeer", "assets/musketeer.png");
   }
 
+  function fetchUnitsFromSupabase() {
+  return supabase
+    .from("units_data")
+    .select("name,tier")
+    .order("tier")
+    .order("name")
+    .then(({ data, error }) => {
+      if (error) {
+        console.error("supabase units_data error:", error);
+        return [];
+      }
+      return (data || []).map((u) => ({
+        id: u.name,
+        name: u.name.charAt(0).toUpperCase() + u.name.slice(1),
+        tier: u.tier ?? 1,
+        iconKey: u.name,
+      }));
+    })
+    .catch((e) => {
+      console.error("fetchUnitsFromSupabase error:", e);
+      return [];
+    });
+}
+
   async create() {
     const levelData = this.cache.json.get(this.level);
 
