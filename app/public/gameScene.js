@@ -3,7 +3,7 @@ import Unit from "./lib/unit.js";
 import EnemyAI from "./lib/enemyAI.js";
 import UnitProgression from "./UnitProgression.js";
 import { supabase } from "./supabaseClient.js";
-import unitTray from "./lib/unitTray.js";
+import UnitTray from "./lib/unitTray.js";
 
 // Helper: fetch the catalog from Supabase (falls back to local list if needed)
 function fetchUnitsFromSupabase() {
@@ -190,7 +190,7 @@ export class GameScene extends Phaser.Scene {
     // Load persisted state, then sync unlocks and HUD
     await this.loadTurnState(this.level);
     await this.loadTiles(this.level);
-    this.unitUI.applyRound(this.round);
+    this.unitUI.applyRound?.(this.round);
     this.renderTurnHud();
 
     // Units
