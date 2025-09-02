@@ -191,6 +191,7 @@ export class GameScene extends Phaser.Scene {
 
     await this.loadTurnState(this.level);
     await this.loadTiles(this.level);
+    this.unitUI.applyRound?.(this.round);
     this.renderTurnHud();
 
     await this.loadUnitDataFromDB();
@@ -231,6 +232,7 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
+    this.createResetButton();
     this.createBackButton();
     this.createSaveLoadButtons();
   }
@@ -288,6 +290,7 @@ export class GameScene extends Phaser.Scene {
 
       this.round += 1;
       this.turnIndex = 0;
+      this.unitUI.applyRound?.(this.round);
     }
 
     this.game.events.emit("turn:changed", { round: this.round });
@@ -298,6 +301,46 @@ export class GameScene extends Phaser.Scene {
     await this.saveTurnState(this.level);
     await this.saveTiles(this.level);
   }
+
+  createResetButton() {
+    const btn = this.add.text(this.scale.width - 80, this.scale.height - 160, "🗑 Reset", {
+    fontSize: "16px",
+    backgroundColor: "#882222",
+    color: "#ffffff",
+    padding: { x: 10, y: 5 },
+  }).setOrigin(0.5).setInteractive();
+
+  btn.on("pointerdown", async () => {
+    const level = this.level;
+    await supabase.from("tiles_state").delete().eq("level", level);
+    await supabase.from("turn_state").delete().eq("level", level);
+    await supabase.from("units_state").delete();           // optional
+    await supabase.from("players").delete().neq("id", 0);  // optional
+
+    // Reset local state back to “new game”
+    this.round = 1;
+    this.turnIndex = 0;
+    this.playerGold = 100;
+
+    // Repaint tiles to match the level JSON (so you’re not stuck in a win)
+    const levelData = this.cache.json.get(this.level);
+    for (const t of levelData.tiles) {
+      const key = `${t.q},${t.r}`;
+      const tile = this.tiles.get(key);
+      if (tile) {
+        tile.setColor(parseInt(t.color));
+        tile.setOwner(null);
+      }
+    }
+
+    // Seed UI
+    this.unitUI.applyRound?.(this.round);
+    this.renderTurnHud();
+    console.log("Reset complete.");
+  });
+
+  this.scale.on("resize", (size) => btn.setPosition(size.width - 80, size.height - 160));
+}
 
   createBackButton() {
     const backBtn = this.add
