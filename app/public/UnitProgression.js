@@ -132,97 +132,102 @@ export default class unitProgression {
     this.list.removeAll(true);
     this.rows = [];
 
-    const pad = 12, rowH = 60, left = 16;
+    const pad = 12;
+    const rowH = 60;
+    const left = 16;
     let y = pad;
 
+    // Safe fallback icon keys (uses the first one that exists in the cache)
+    const fallbackKeys = [
+      "warrior","scout","slinger","archer","swordsman",
+      "horseman","knight","chariot","lancer","musketeer"
+    ];
+    const findFallbackKey = () =>
+      fallbackKeys.find((k) => this.scene.textures.exists(k)) || null;
+
     for (const u of this.units) {
-      try {
-        // pick a safe texture key
-        const iconKey = this._safeIconKey(u.iconKey || u.id || u.name);
-        const row = this.scene.add.container(0, y);
+      const row = this.scene.add.container(0, y);
 
-        // Build tray; if it fails we skip the row to avoid crashing the scene
-        const tray = new UnitTray(
-          this.scene,
-          36, 30,              // x,y inside the row
-          iconKey,             // texture key
-          "Player 1",          // owner label for cost lookups (your game uses P1)
-          this.UnitClass,      // class used to spawn
-          u.id                 // unit type id (matches DB + textures)
-        );
+      // Choose a texture that actually exists so UnitTray can build a sprite
+      const textureKey =
+        (u.iconKey && this.scene.textures.exists(u.iconKey))
+          ? u.iconKey
+          : findFallbackKey();
 
-        if (!tray?.sprite) {
-          console.warn("[UnitProgression] Tray sprite missing for", u);
-          row.add(this._fallbackRowGraphic(left));
-          this.list.add(row);
-          this.rows.push({ unit: u, container: row, tray: null, label: null, lockOverlay: null });
-          y += rowH;
-          continue;
-        }
+      // Build the tray (gracefully handles if textureKey is null)
+      const tray = new UnitTray(
+        this.scene,
+        36,              // x (within the sidebar)
+        30,              // y (within the row)
+        textureKey,      // texture for the icon
+        "Player 1",      // owner name shown in your UI
+        Unit,            // Unit class to spawn
+        u.id             // unit type/id
+      );
 
-        const label = this.scene.add.text(
-          left + 48,
-          12,
-          `${u.name ?? u.id ?? "?"}  (T${u.tier ?? "?"})`,
-          {
-            fontFamily: '"JetBrains Mono", monospace',
-            fontSize: "16px",
-            color: "#ffffff",
-          }
-        );
-
-        // when UnitTray finishes loading cost (from Supabase), update the label
-        tray.onCostLoaded = (cost) => {
-          const name = u.name ?? u.id ?? "Unit";
-          const tier = u.tier ?? "?";
-          label.setText(`${name} (T${tier})  ${Number.isFinite(cost) ? cost : "?"}g`);
-        };
-
-        const lockOverlay = this.scene.add
-          .rectangle(0, 0, this.panelWidth, rowH, 0x000000, 0.45)
-          .setOrigin(0, 0)
-          .setVisible(false);
-
-        const underline = this.scene.add
-          .rectangle(0, rowH - 1, this.panelWidth, 1, 0x2a2f41)
-          .setOrigin(0, 1);
-
-        // Only add defined GameObjects to avoid “willRender/once” crashes
-        row.add([tray.sprite, label, lockOverlay, underline].filter(Boolean));
-        row.setPosition(0, y);
-        this.list.add(row);
-
-        this.rows.push({ unit: u, container: row, tray, label, lockOverlay });
-        y += rowH;
-      } catch (err) {
-        console.error("[UnitProgression] failed to create row for", u, err);
+      // If, for any reason, no sprite was created, draw a simple placeholder box
+      let trayDisplay = tray.sprite;
+      if (!trayDisplay) {
+        console.warn("[UnitProgression] Tray sprite missing for", u);
+        trayDisplay = this.scene.add
+          .rectangle(36, 30, 40, 40, 0x666666, 1)
+          .setStrokeStyle(2, 0x222222);
       }
-    }
-  }
 
-  _layout(w, h) {
-    this.bg?.setSize(this.panelWidth, h);
-    this.bg?.setPosition(0, 0);
-    this.list?.setPosition(0, 40);
+      // Label (name + tier + cost once loaded)
+      const displayName = u.name ?? "Unit";
+      const label = this.scene.add.text(
+        left + 48,
+        12,
+        `${displayName}  (T${u.tier ?? "?"}) — ?`,
+        {
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: "16px",
+          color: "#ffffff",
+        }
+      );
+
+      // When UnitTray finishes fetching the cost, reflect it in the label
+      tray.onCostLoaded = (cost) => {
+        label.setText(`${displayName}  (T${u.tier ?? "?"}) — ${cost ?? "?"}`);
+      };
+
+      // Lock overlay + underline
+      const lockOverlay = this.scene.add
+        .rectangle(0, 0, this.panelWidth, rowH, 0x000000, 0.45)
+        .setOrigin(0, 0)
+        .setVisible(false);
+
+      const underline = this.scene.add
+        .rectangle(0, rowH - 1, this.panelWidth, 1, 0x2a2f41)
+        .setOrigin(0, 1);
+
+      // Compose the row
+      row.add([trayDisplay, label, lockOverlay, underline]);
+      row.setPosition(0, y);
+      this.list.add(row);
+
+      // Track references for later
+      this.rows.push({ unit: u, container: row, tray, label, lockOverlay });
+
+      y += rowH;
+    }
   }
 
   _renderLocks() {
     for (const row of this.rows) {
-      const locked = (row.unit?.tier ?? 1) > this.unlockedTier;
+      const locked = row.unit.tier > this.unlockedTier;
+      row.lockOverlay.setVisible(locked);
 
-      if (row.lockOverlay) row.lockOverlay.setVisible(locked);
-
-      // Interactivity only when unlocked and sprite exists
       if (row.tray?.sprite) {
         row.tray.sprite.disableInteractive();
         if (!locked) row.tray.sprite.setInteractive({ useHandCursor: true });
         row.tray.sprite.setAlpha(locked ? 0.35 : 1);
-      }
+   }
 
-      if (row.label) row.label.setAlpha(locked ? 0.6 : 1);
-    }
+    row.label.setAlpha(locked ? 0.6 : 1);
   }
-
+}
   _safeIconKey(key) {
     // Make sure the texture exists; fall back to a known key you have loaded.
     if (key && this.scene.textures.exists(key)) return key;

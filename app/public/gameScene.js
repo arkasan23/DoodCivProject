@@ -17,12 +17,20 @@ function fetchUnitsFromSupabase() {
         console.error("supabase units_data error:", error);
         return [];
       }
-      return (data || []).map((u) => ({
-        id: u.name,
-        name: u.name.charAt(0).toUpperCase() + u.name.slice(1),
-        tier: u.tier ?? 1,
-        iconKey: u.name,
-      }));
+      // Map Supabase names -> asset keys you actually loaded
+      // e.g. "Warrior" -> "warrior", "Horseman" -> "horseman"
+      return (data || []).map((u) => {
+        const key = String(u.name || "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, ""); // if you ever had spaces in names
+        return {
+          id: key,                 // use the safe key internally
+          name: u.name,            // display pretty name
+          tier: u.tier ?? 1,
+          iconKey: key,            // MUST match this.load.image(...) key
+        };
+      });
     })
     .catch((e) => {
       console.error("fetchUnitsFromSupabase error:", e);
