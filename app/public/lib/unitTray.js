@@ -1,3 +1,5 @@
+import { supabase } from "../supabaseClient.js";
+
 export default class UnitTray {
   constructor(scene, x, y, textureKey, ownerIndex, UnitClass, id) {
     this.scene = scene;
@@ -27,26 +29,23 @@ export default class UnitTray {
 
     this.scene.input.setDraggable(this.sprite, true);
 
-    this.fetchCost();
+    const cost = await fetchUnitCost(unitId);
     this.registerDragEvents();
   }
 
-  async fetchCost() {
-    const unitType = this.id || this.textureKey;
-    try {
-      const response = await fetch(
-        `http://localhost:3000/get_unit?unitName=${unitType}`,
-      );
-      const data = await response.json();
-      this.cost = data.cost;
+  async function fetchUnitCost(name) {
+   const { data, error } = await supabase
+    .from("units_data")
+    .select("cost")
+    .eq("name", name)
+    .single();
 
-      if (this.onCostLoaded) {
-        this.onCostLoaded(this.cost);
-      }
-    } catch (err) {
-      console.error("Failed to fetch unit cost:", err);
-    }
+  if (error) {
+    console.error("fetchUnitCost error:", error);
+    return null; // or a sensible default like 999
   }
+  return data?.cost ?? null;
+}
 
   setAffordable(canAfford) {
     this.affordable = canAfford;

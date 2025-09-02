@@ -191,7 +191,7 @@ export class GameScene extends Phaser.Scene {
 
     await this.loadTurnState(this.level);
     await this.loadTiles(this.level);
-    this.unitUI.applyRound?.(this.round);
+    this.unitUI.applyRound(this.round);
     this.renderTurnHud();
 
     await this.loadUnitDataFromDB();
@@ -290,7 +290,7 @@ export class GameScene extends Phaser.Scene {
 
       this.round += 1;
       this.turnIndex = 0;
-      this.unitUI.applyRound?.(this.round);
+      this.unitUI.applyRound(this.round);
     }
 
     this.game.events.emit("turn:changed", { round: this.round });
