@@ -1,186 +1,123 @@
+// app/public/lib/unitTray.js
 import { supabase } from "../supabaseClient.js";
 
-export default class UnitTray {
-  constructor(scene, x, y, textureKey, ownerIndex, UnitClass, id) {
-    this.scene = scene;
+/**
+ * Very small, self-contained unit tray.
+ * - Shows each unit with its cost (fetched from Supabase).
+ * - Greys out rows you can't afford or haven't unlocked yet.
+ * - Calls onSpawn(unit) when clicked and allowed.
+ */
+export default class unitTray extends Phaser.GameObjects.Container {
+  /**
+   * @param {Phaser.Scene} scene
+   * @param {number} x
+   * @param {number} y
+   * @param {Array<{id:string,name:string,tier:number,iconKey:string}>} units
+   * @param {() => number} getGold            callback returning current gold
+   * @param {() => number} getUnlockedTier    callback returning max unlocked tier
+   * @param {(unit:object) => void} onSpawn   when a unit is selected
+   */
+  constructor(scene, x, y, units, getGold, getUnlockedTier, onSpawn) {
+    super(scene, x, y);
+    scene.add.existing(this);
 
-    this.sprite = scene.add
-      .image(x, y, textureKey)
-      .setOrigin(0.5, 0.5)
-      .setScale(0.5)
-      .setInteractive({ useHandCursor: true });
+    this.units = units || [];
+    this.getGold = getGold || (() => 0);
+    this.getUnlockedTier = getUnlockedTier || (() => 1);
+    this.onSpawn = onSpawn || (() => {});
+    this.rows = [];
 
-    this.sprite.setDepth(20);
-
-    this.sprite.startX = x;
-    this.sprite.startY = y;
-
-    this.sprite.originalX = null;
-    this.sprite.originalY = null;
-
-    this.ownerIndex = ownerIndex;
-    this.UnitClass = UnitClass;
-    this.textureKey = textureKey;
-    this.unit = null;
-    this.id = id;
-
-    this.cost = null;
-    this.affordable = true;
-
-    this.scene.input.setDraggable(this.sprite, true);
-
-    const cost = await fetchUnitCost(unitId);
-    this.registerDragEvents();
+    this._build();
   }
 
-  async function fetchUnitCost(name) {
-   const { data, error } = await supabase
-    .from("units_data")
-    .select("cost")
-    .eq("name", name)
-    .single();
+  _build() {
+    this.removeAll(true);
+    this.rows = [];
 
-  if (error) {
-    console.error("fetchUnitCost error:", error);
-    return null; // or a sensible default like 999
+    let y = 0;
+    for (const u of this.units) {
+      const row = this.scene.add.container(0, y);
+      const bg = this.scene.add.rectangle(0, 0, 220, 36, 0x1e1e2f, 0.55).setOrigin(0);
+      const icon = this.scene.add.image(8 + 16, 18, u.iconKey).setDisplaySize(28, 28).setOrigin(0.5);
+      const label = this.scene.add.text(48, 8, `${u.name} — …`, {
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: "14px",
+        color: "#ffffff",
+      });
+
+      row.add([bg, icon, label]);
+      row.setSize(220, 36);
+      row.setInteractive(new Phaser.Geom.Rectangle(0, 0, 220, 36), Phaser.Geom.Rectangle.Contains);
+      row.on("pointerdown", () => {
+        if (!this._isUnlocked(u) || !this._isAffordable(row.cost)) return;
+        this.onSpawn(u);
+      });
+
+      // Store references for later updates
+      row.unit = u;
+      row.label = label;
+      row.cost = null;
+
+      // Fetch cost asynchronously (no top-level await)
+      this._fetchCost(u.id).then((cost) => {
+        row.cost = cost;
+        label.setText(`${u.name} — ${cost ?? "?"}`);
+        this._applyState(row);
+      });
+
+      this.add(row);
+      this.rows.push(row);
+      y += 40;
+    }
+
+    // First pass styling
+    this.updateAffordability();
   }
-  return data?.cost ?? null;
-}
 
-  setAffordable(canAfford) {
-    this.affordable = canAfford;
-
-    if (canAfford) {
-      this.sprite.clearTint();
-    } else {
-      this.sprite.setTint(0x555555);
+  async _fetchCost(unitName) {
+    try {
+      const { data, error } = await supabase
+        .from("units_data")
+        .select("cost")
+        .eq("name", unitName)
+        .single();
+      if (error) throw error;
+      return data?.cost ?? null;
+    } catch (err) {
+      console.error(`Failed to fetch cost for ${unitName}:`, err);
+      return null;
     }
   }
 
-  registerDragEvents() {
-    const scene = this.scene;
-
-    this.sprite.on("dragstart", (pointer) => {
-      if (!this.affordable) {
-        this.sprite.x = this.sprite.startX;
-        this.sprite.y = this.sprite.startY;
-        this.sprite.setDepth(20);
-        return;
-      }
-
-      this.sprite.setDepth(2000);
-      this.highlightValidTiles();
-    });
-
-    this.sprite.on("drag", (pointer, dragX, dragY) => {
-      if (!this.affordable) return;
-
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
-
-      this.sprite.setDepth(2000);
-
-      const parentWorldY = this.sprite.parentContainer
-        ? this.sprite.parentContainer.y
-        : 0;
-
-      const nearestTile = this.getNearestValidTile(worldX, worldY);
-      if (nearestTile) {
-        this.sprite.x = nearestTile.x;
-        this.sprite.y = nearestTile.y - (parentWorldY + 40);
-      } else {
-        this.sprite.x = dragX;
-        this.sprite.y = dragY;
-      }
-    });
-
-    this.sprite.on("drop", async (pointer) => {
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
-
-      const playerGold = this.scene.playerGold;
-      if (playerGold < this.cost) {
-        return;
-      }
-
-      const nearestTile = this.getNearestValidTile(worldX, worldY);
-
-      if (nearestTile) {
-        const unit = new this.UnitClass(
-          this.scene,
-          nearestTile.q,
-          nearestTile.r,
-          this.textureKey,
-          this.ownerIndex,
-          this.id,
-        );
-
-        unit.moveToTile(nearestTile);
-        nearestTile.unit = unit;
-        unit.boundTile = nearestTile;
-
-        this.scene.units.push(unit);
-        unit.sprite.setName("unit-" + unit.id);
-
-        this.scene.playerGold -= this.cost;
-
-        await fetch("http://localhost:3000/set_gold", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Player 1", gold: this.scene.playerGold }),
-        });
-
-        console.log(
-          `Player ${this.ownerIndex} bought ${this.id || this.textureKey} for ${this.cost} gold`,
-        );
-      }
-
-      this.sprite.x = this.sprite.startX;
-      this.sprite.y = this.sprite.startY;
-      this.sprite.setDepth(20);
-      this.clearHighlights();
-    });
-
-    this.sprite.on("dragend", () => {
-      this.sprite.x = this.sprite.startX;
-      this.sprite.y = this.sprite.startY;
-      this.sprite.setDepth(20);
-      this.clearHighlights();
-    });
+  _isUnlocked(unit) {
+    return this.getUnlockedTier() >= (unit.tier ?? 1);
   }
 
-  highlightValidTiles() {
-    this.validTiles = Array.from(this.scene.tiles.values()).filter(
-      (tile) => tile.owner === this.ownerIndex && !tile.unit,
-    );
-
-    this.validTiles.forEach((tile) => tile.setColor(0xffff66));
-    this.scene.highlightedTiles.push(...this.validTiles);
+  _isAffordable(cost) {
+    if (cost == null) return false;
+    return this.getGold() >= cost;
   }
 
-  clearHighlights() {
-    if (!this.validTiles) return;
-    this.validTiles.forEach((tile) => tile.setColor(tile.baseColor));
-    this.scene.highlightedTiles = [];
-    this.validTiles = [];
+  _applyState(row) {
+    const unlocked = this._isUnlocked(row.unit);
+    const affordable = this._isAffordable(row.cost);
+    const alpha = unlocked ? 1 : 0.35;
+
+    row.setAlpha(alpha);
+    if (row.input) row.input.enabled = unlocked && affordable;
+    row.label.setColor(affordable && unlocked ? "#ffffff" : "#aaaaaa");
   }
 
-  getNearestValidTile(x, y) {
-    if (!this.validTiles || this.validTiles.length === 0) return null;
+  /** Call this whenever gold or tier changes */
+  updateAffordability() {
+    for (const row of this.rows) {
+      this._applyState(row);
+    }
+  }
 
-    let nearest = null;
-    let minDist = Infinity;
-
-    this.validTiles.forEach((tile) => {
-      const dist = Phaser.Math.Distance.Between(x, y, tile.x, tile.y);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = tile;
-      }
-    });
-
-    const radius = 30;
-    if (minDist <= (Math.sqrt(3) * radius) / 2) return nearest;
-    return null;
+  /** If your unit list changes at runtime */
+  rebuild(units) {
+    this.units = units.slice();
+    this._build();
   }
 }

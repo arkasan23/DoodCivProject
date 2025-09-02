@@ -1,11 +1,10 @@
 import Tile from "./lib/tile.js";
-import UnitTray from "./lib/unitTray.js";
 import Unit from "./lib/unit.js";
 import EnemyAI from "./lib/enemyAI.js";
 import UnitProgression from "./UnitProgression.js";
 import { supabase } from "./supabaseClient.js";
 
-// helper function for supanbase
+// Helper: fetch the catalog from Supabase (falls back to local list if needed)
 function fetchUnitsFromSupabase() {
   return supabase
     .from("units_data")
@@ -59,6 +58,7 @@ export class GameScene extends Phaser.Scene {
 
   init(data) {
     this.level = data.level;
+
     // Reset scene-level state
     this.players = ["Player 1"];
     this.turnIndex = 0;
@@ -85,7 +85,6 @@ export class GameScene extends Phaser.Scene {
     if (this.goldText) {
       this.goldText.setText(`Gold: ${this._playerGold}`);
     }
-
     if (this.unitUI) {
       this.unitUI.updateTrayAffordability(this._playerGold);
     }
@@ -142,8 +141,6 @@ export class GameScene extends Phaser.Scene {
       onTierUnlock: (tier) => console.log(`Unlocked Tier ${tier}`),
     });
 
-    this.scale.on("resize", () => { /* UnitProgression relayouts automatically */ });
-
     // ===== GRID =====
     const radius = 30;
     const hexWidth = Math.sqrt(3) * radius;
@@ -189,13 +186,16 @@ export class GameScene extends Phaser.Scene {
     // ===== HUD =====
     this.createTurnHud();
 
+    // Load persisted state, then sync unlocks and HUD
     await this.loadTurnState(this.level);
     await this.loadTiles(this.level);
     this.unitUI.applyRound(this.round);
     this.renderTurnHud();
 
+    // Units
     await this.loadUnitDataFromDB();
 
+    // Input
     this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
 
     this.scale.on("resize", (size) => {
@@ -207,10 +207,8 @@ export class GameScene extends Phaser.Scene {
 
     this.input.on("gameobjectdown", async (_pointer, obj) => {
       if (obj.unitId) {
-        const unit = this.units.find((unit) => unit.id === obj.unitId);
-        if (unit) {
-          this.onUnitClick(unit);
-        }
+        const unit = this.units.find((u) => u.id === obj.unitId);
+        if (unit) this.onUnitClick(unit);
       }
     });
 
@@ -256,38 +254,35 @@ export class GameScene extends Phaser.Scene {
 
   checkWinLose() {
     const allTiles = Array.from(this.tiles.values());
+    const allPlayer = allTiles.filter((t) => t.owner === "Player 1").length;
+    const allEnemy = allTiles.filter((t) => t.owner && t.owner.startsWith("AI")).length;
 
-    const allPlayer = allTiles.filter((tile) => tile.owner === "Player 1").length;
-    const allEnemy = allTiles.filter(
-      (tile) => tile.owner && tile.owner.startsWith("AI"),
-    ).length;
-
-    if (allEnemy === 0) {
-      this.showEndScreen("win");
-    } else if (allPlayer === 0) {
-      this.showEndScreen("lose");
-    }
+    if (allEnemy === 0) this.showEndScreen("win");
+    else if (allPlayer === 0) this.showEndScreen("lose");
   }
 
   async advanceTurn() {
     const current = this.currentPlayer();
 
     if (current === "Player 1") {
-      this.units.forEach((unit) => {
-        if (unit.owner === current) unit.incrementTurn();
+      // refresh movement
+      this.units.forEach((u) => {
+        if (u.owner === current) u.incrementTurn();
       });
 
+      // gold income
       const ownedTileCount = Array.from(this.tiles.values()).filter(
-        (tile) => tile.owner === current,
+        (t) => t.owner === current,
       ).length;
-      const goldGained = ownedTileCount * 5;
-      this.playerGold += goldGained;
+      this.playerGold += ownedTileCount * 5;
 
+      // AIs act
       for (const ai of this.AIs) {
         ai.newTurn();
         ai.takeTurn();
       }
 
+      // round advance + unlocks
       this.round += 1;
       this.turnIndex = 0;
       this.unitUI.applyRound(this.round);
@@ -298,49 +293,54 @@ export class GameScene extends Phaser.Scene {
     this.renderTurnHud();
     this.checkWinLose();
 
+    // persist
     await this.saveTurnState(this.level);
     await this.saveTiles(this.level);
   }
 
   createResetButton() {
-    const btn = this.add.text(this.scale.width - 80, this.scale.height - 160, "🗑 Reset", {
-    fontSize: "16px",
-    backgroundColor: "#882222",
-    color: "#ffffff",
-    padding: { x: 10, y: 5 },
-  }).setOrigin(0.5).setInteractive();
+    const btn = this.add
+      .text(this.scale.width - 80, this.scale.height - 160, "🗑 Reset", {
+        fontSize: "16px",
+        backgroundColor: "#882222",
+        color: "#ffffff",
+        padding: { x: 10, y: 5 },
+      })
+      .setOrigin(0.5)
+      .setInteractive();
 
-  btn.on("pointerdown", async () => {
-    const level = this.level;
-    await supabase.from("tiles_state").delete().eq("level", level);
-    await supabase.from("turn_state").delete().eq("level", level);
-    await supabase.from("units_state").delete();           // optional
-    await supabase.from("players").delete().neq("id", 0);  // optional
+    btn.on("pointerdown", async () => {
+      const level = this.level;
+      await supabase.from("tiles_state").delete().eq("level", level);
+      await supabase.from("turn_state").delete().eq("level", level);
+      await supabase.from("units_state").delete();           // optional
+      await supabase.from("players").delete().neq("id", 0);  // optional
 
-    // Reset local state back to “new game”
-    this.round = 1;
-    this.turnIndex = 0;
-    this.playerGold = 100;
+      // Reset local state
+      this.round = 1;
+      this.turnIndex = 0;
+      this.playerGold = 100;
 
-    // Repaint tiles to match the level JSON (so you’re not stuck in a win)
-    const levelData = this.cache.json.get(this.level);
-    for (const t of levelData.tiles) {
-      const key = `${t.q},${t.r}`;
-      const tile = this.tiles.get(key);
-      if (tile) {
-        tile.setColor(parseInt(t.color));
-        tile.setOwner(null);
+      // Repaint tiles from level JSON
+      const levelData = this.cache.json.get(this.level);
+      for (const t of levelData.tiles) {
+        const key = `${t.q},${t.r}`;
+        const tile = this.tiles.get(key);
+        if (tile) {
+          tile.setColor(parseInt(t.color));
+          tile.setOwner(null);
+        }
       }
-    }
 
-    // Seed UI
-    this.unitUI.applyRound?.(this.round);
-    this.renderTurnHud();
-    console.log("Reset complete.");
-  });
+      this.unitUI.applyRound?.(this.round);
+      this.renderTurnHud();
+      console.log("Reset complete.");
+    });
 
-  this.scale.on("resize", (size) => btn.setPosition(size.width - 80, size.height - 160));
-}
+    this.scale.on("resize", (size) =>
+      btn.setPosition(size.width - 80, size.height - 160),
+    );
+  }
 
   createBackButton() {
     const backBtn = this.add
@@ -355,7 +355,7 @@ export class GameScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     backBtn.on("pointerdown", () => {
-      this.units.forEach((unit) => unit.sprite?.destroy());
+      this.units.forEach((u) => u.sprite?.destroy());
       this.units = [];
       this.unitUI?.destroy();
       this.scene.start("level_select");
@@ -401,6 +401,8 @@ export class GameScene extends Phaser.Scene {
       await this.loadTurnState(level);
       await this.loadTiles(level);
       await this.loadUnitDataFromDB();
+      this.unitUI.applyRound(this.round); // keep unlocks in sync after load
+      this.renderTurnHud();
     });
 
     saveBtn.on("pointerover", () => {
@@ -462,7 +464,7 @@ export class GameScene extends Phaser.Scene {
   showEndScreen(result) {
     this.input.keyboard.removeAllListeners();
     this.unitUI?.destroy();
-    this.unitTray?.destroy();
+    // (no UnitTray anymore)
 
     const overlay = this.add.rectangle(
       this.scale.width / 2,
@@ -522,6 +524,7 @@ export class GameScene extends Phaser.Scene {
         .select("id, unit_type, current_health, owned_by, q_pos, r_pos, moves_left");
       if (error) throw error;
 
+      // clear existing
       this.units.forEach((u) => u.sprite.destroy());
       this.units = [];
 
@@ -545,9 +548,7 @@ export class GameScene extends Phaser.Scene {
         unit.sprite.setInteractive();
         unit.sprite.on("pointerdown", () => {
           if (!this.selectedUnit) {
-            if (unit.owner === "Player 1") {
-              this.selectedUnit = unit;
-            }
+            if (unit.owner === "Player 1") this.selectedUnit = unit;
             return;
           }
           if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
@@ -601,14 +602,14 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (data.victimUpdated && data.victimUpdated.current_health > 0) {
-        let victimUnit = this.units.find((unit) => unit.id === victimId);
+        let victimUnit = this.units.find((u) => u.id === victimId);
         if (victimUnit) {
           console.log(`Victim ${victimId} now has ${data.victimUpdated.current_health} HP`);
         }
       }
 
       if (data.victimDefeated) {
-        let victimIndex = this.units.findIndex((unit) => unit.id === victimId);
+        let victimIndex = this.units.findIndex((u) => u.id === victimId);
         if (victimIndex !== -1) {
           this.units[victimIndex].sprite.destroy();
           this.units.splice(victimIndex, 1);
@@ -697,3 +698,4 @@ export class GameScene extends Phaser.Scene {
     console.log("Tiles loaded.");
   }
 }
+
