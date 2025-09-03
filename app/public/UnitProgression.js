@@ -137,37 +137,40 @@ _layout(w, h) {
   this.list?.setPosition(0, 40);
 }
 
-// --- replace your current _rebuildRows with this ---
 _rebuildRows() {
+  // nuke existing UI
   this.list.removeAll(true);
   this.rows = [];
 
+  const pad = 12;
   const rowH = 60;
-  let y = 12;
+  const left = 16;
+  let y = pad;
 
   for (const u of this.units) {
     const row = this.scene.add.container(0, y);
 
-    // Create a tray. IMPORTANT: your UnitTray must set `this.sprite`
-    // to the interactive GameObject it creates.
+    // Build the tray first
     const tray = new UnitTray(
       this.scene,
-      16,            // x inside the row
-      30,            // y inside the row
-      u.iconKey,     // texture key (we just show a box if it’s missing)
-      "Player 1",    // owner
-      Unit,          // class to spawn (not used yet by the tray)
-      u.id           // unit id / name
+      36,              // x (within the left panel)
+      30,              // y (within the row)
+      u.iconKey,       // texture key (matches your preloaded asset)
+      "Player 1",      // owner label used by your UnitTray
+      Unit,            // Unit class
+      u.id             // unit id / name
     );
 
-    // Fallback if UnitTray didn't set .sprite (prevents crash)
-    const traySprite = tray.sprite ?? this.scene.add.rectangle(16, 30, 28, 28, 0x555555).setOrigin(0.5);
-    if (!tray.sprite) {
+    // If UnitTray didn't produce a sprite (bad/missing icon), make a placeholder
+    let traySprite = tray.sprite;
+    if (!traySprite) {
       console.warn("[UnitProgression] Tray sprite missing for", u);
+      traySprite = this.scene.add.rectangle(36, 30, 34, 34, 0x666666).setOrigin(0.5);
     }
 
+    // Label
     const label = this.scene.add.text(
-      16 + 48, // to the right of the tray
+      left + 48,
       12,
       `${u.name}  (T${u.tier}) — ?`,
       {
@@ -176,38 +179,38 @@ _rebuildRows() {
         color: "#ffffff",
       }
     );
-    const key = u.iconKey;
-    if (!this.scene.textures.exists(key)) {
-       console.warn("[UnitProgression] Tray sprite missing for", u);
-       // draw a tiny placeholder rect so you can still click
-       const placeholder = this.scene.add.rectangle(36, 30, 28, 28, 0x666666).setOrigin(0.5);
-       row.add(placeholder);
-     } else {
-        row.add(tray.sprite);   // normal flow 
-     }
-     row.add([label, lockOverlay, underline]);
 
-    // If UnitTray asynchronously learns the cost, let it update the label
+    // Update label once cost is fetched
     tray.onCostLoaded = (cost) => {
       label.setText(`${u.name}  (T${u.tier}) — ${cost ?? "?"}`);
     };
 
+    // Lock overlay (DECLARE BEFORE USING in row.add)
     const lockOverlay = this.scene.add
       .rectangle(0, 0, this.panelWidth, rowH, 0x000000, 0.45)
       .setOrigin(0, 0)
       .setVisible(false);
 
+    // Row underline
     const underline = this.scene.add
       .rectangle(0, rowH - 1, this.panelWidth, 1, 0x2a2f41)
       .setOrigin(0, 1);
 
+    // Add to row in final order
     row.add([traySprite, label, lockOverlay, underline]);
     row.setPosition(0, y);
+    row.setSize(this.panelWidth, rowH);
     this.list.add(row);
 
-    this.rows.push({ unit: u, container: row, tray, label, lockOverlay });
+    // Track the row parts we need later
+    this.rows.push({ unit: u, container: row, tray, label, lockOverlay, traySprite });
+
     y += rowH;
   }
+
+  // Lay out and apply locks for the current round
+  this._layout(this.scene.scale.width, this.scene.scale.height);
+  this._renderLocks();
 }
 
 // --- make sure this method also exists (this is what _buildUI calls) ---
