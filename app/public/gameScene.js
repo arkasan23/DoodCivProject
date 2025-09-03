@@ -25,10 +25,10 @@ function fetchUnitsFromSupabase() {
           .trim()
           .replace(/\s+/g, ""); // if you ever had spaces in names
         return {
-          id: key,                 // use the safe key internally
-          name: u.name,            // display pretty name
+          id: key, // use the safe key internally
+          name: u.name, // display pretty name
           tier: u.tier ?? 1,
-          iconKey: key,            // MUST match this.load.image(...) key
+          iconKey: key, // MUST match this.load.image(...) key
         };
       });
     })
@@ -118,192 +118,236 @@ export class GameScene extends Phaser.Scene {
   }
 
   async create() {
-  // --- ultra-simple on-screen logger so blue screens still tell us something ---
-  const dbg = this.add.text(12, 8, 'GameScene.create(): start', {
-    fontFamily: '"JetBrains Mono", monospace',
-    fontSize: '14px',
-    color: '#fff'
-  }).setDepth(5000).setScrollFactor(0);
+    // --- ultra-simple on-screen logger so blue screens still tell us something ---
+    const dbg = this.add
+      .text(12, 8, "GameScene.create(): start", {
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: "14px",
+        color: "#fff",
+      })
+      .setDepth(5000)
+      .setScrollFactor(0);
 
-  const say = (m) => { console.log(m); dbg.setText(m); };
-
-  try {
-    say('load level json from cache');
-    const levelData = this.cache.json.get(this.level);
-
-    if (!levelData) {
-      // If for some reason the json wasn't in cache, try to (re)queue it and wait.
-      say(`level "${this.level}" not in cache — trying to (re)load`);
-      this.load.json("level1", "assets/levels/level1.json");
-      this.load.json("level2", "assets/levels/level2.json");
-      this.load.json("level3", "assets/levels/level3.json");
-      await new Promise((res) => this.load.once(Phaser.Loader.Events.COMPLETE, res));
-      this.load.start();
-    }
-
-    // ========== PLAYERS ==========
-    say('seed players (Supabase guarded)');
-    try {
-      await supabase.from("players").delete().neq("id", 0);
-      // Build AI list before inserting rows
-      for (let i = 1; i < levelData.num_enemies + 1; i++) {
-        const aiName = "AI " + i;
-        this.players.push(aiName);
-        this.AIs.push(new EnemyAI(this, aiName));
-      }
-      await supabase.from("players").insert(this.players.map((name) => ({ name })));
-    } catch (e) {
-      console.warn('[players] ignoring error:', e);
-    }
-
-    // ========== GRID ==========
-    say('build hex grid');
-    const radius = 30;
-    const hexWidth = Math.sqrt(3) * radius;
-    const hexHeight = 2 * radius;
-
-    const cols = levelData.cols;
-    const rows = levelData.rows;
-
-    const gridPixelWidth = hexWidth * cols + hexWidth / 2;
-    const gridPixelHeight = hexHeight * 0.75 * rows + hexHeight / 4;
-
-    const offsetX = (this.scale.width - gridPixelWidth) / 2;
-    const offsetY = (this.scale.height - gridPixelHeight) / 2;
-
-    const playerColors = {
-      "Player 1": 0x3377cc,
-      "AI 1": 0xd2042d,
-      "AI 2": 0xcc3333,
+    const say = (m) => {
+      console.log(m);
+      dbg.setText(m);
     };
 
-    this.tiles = new Map();
-
-    for (const tileData of levelData.tiles) {
-      const { q, r, color } = tileData;
-      const tileColor = parseInt(color);
-      const tile = new Tile(this, q, r, offsetX, offsetY, tileColor);
-
-      for (const [playerName, playerColor] of Object.entries(playerColors)) {
-        if (tileColor === playerColor) {
-          tile.setOwner(playerName);
-          break;
-        }
-      }
-      this.tiles.set(`${q},${r}`, tile);
-
-      // drop zone (safe but not required for drawing)
-      const dz = this.add
-        .zone(tile.x, tile.y, hexWidth * 0.9, hexHeight * 0.9)
-        .setRectangleDropZone(hexWidth * 0.9, hexHeight * 0.9);
-      dz.setData("tileObj", tile);
-    }
-
-    this.input.setTopOnly(true);
-
-    // ========== HUD ==========
-    say('create HUD');
-    this.createTurnHud();
-    this.turnText.setText(`Round: ${this.round}`);
-    this.goldText.setText(`Gold: ${this.playerGold}`);
-
-    // Persistent state (guard Supabase failures so we still render)
-    say('load persisted turn & tiles (guarded)');
-    try { await this.loadTurnState(this.level); } catch (e) { console.warn('loadTurnState', e); }
-    try { await this.loadTiles(this.level); } catch (e) { console.warn('loadTiles', e); }
-
-    // ========== UNIT PROGRESSION PANEL ==========
-    say('build UnitProgression panel');
-    let unitCatalog = [];
     try {
-      unitCatalog = await (async () => {
-        const { data, error } = await supabase
-          .from("units_data").select("name,tier").order("tier").order("name");
-        if (error) throw error;
-        return (data || []).map(u => ({
-          id: u.name,
-          name: u.name,
-          tier: u.tier ?? 1,
-          // iconKey optional; UnitTray shows placeholder square if missing
-        }));
-      })();
-    } catch (e) {
-      console.warn('[units_data] falling back:', e);
-    }
+      say("load level json from cache");
+      const levelData = this.cache.json.get(this.level);
 
-    const fallbackUnits = [
-      { id: "scout", name: "scout", tier: 1 },
-      { id: "slinger", name: "slinger", tier: 1 },
-      { id: "warrior", name: "warrior", tier: 1 },
-      { id: "archer", name: "archer", tier: 2 },
-      { id: "horseman", name: "horseman", tier: 2 },
-      { id: "swordsman", name: "swordsman", tier: 2 },
-      { id: "chariot", name: "chariot", tier: 3 },
-      { id: "knight", name: "knight", tier: 3 },
-      { id: "lancer", name: "lancer", tier: 3 },
-      { id: "musketeer", name: "musketeer", tier: 4 },
-    ];
-
-    // UnitProgression is robust to missing textures now
-    this.unitUI = new UnitProgression(this, {
-      units: unitCatalog.length ? unitCatalog : fallbackUnits,
-      turnsPerTier: 5,
-      onTierUnlock: (tier) => console.log(`Unlocked Tier ${tier}`),
-    });
-
-    // Apply current round to lock/unlock tiers
-    this.unitUI.applyRound(this.round ?? 1);
-
-    // ========== UNITS FROM DB ==========
-    say('load units_state (guarded)');
-    try { await this.loadUnitDataFromDB(); } catch (e) { console.warn('loadUnitDataFromDB', e); }
-
-    // Keyboard & interactions
-    this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
-
-    this.scale.on("resize", (size) => {
-      const x = size.width - 260;
-      if (this.turnText) this.turnText.setPosition(x, 20);
-      if (this.endTurnBtn) this.endTurnBtn.setPosition(x, 92);
-      if (this.goldText) this.goldText.setPosition(x, 160);
-    });
-
-    this.input.on("gameobjectdown", async (_pointer, obj) => {
-      if (obj.unitId) {
-        const unit = this.units.find((u) => u.id === obj.unitId);
-        if (unit) this.onUnitClick(unit);
+      if (!levelData) {
+        // If for some reason the json wasn't in cache, try to (re)queue it and wait.
+        say(`level "${this.level}" not in cache — trying to (re)load`);
+        this.load.json("level1", "assets/levels/level1.json");
+        this.load.json("level2", "assets/levels/level2.json");
+        this.load.json("level3", "assets/levels/level3.json");
+        await new Promise((res) =>
+          this.load.once(Phaser.Loader.Events.COMPLETE, res),
+        );
+        this.load.start();
       }
-    });
 
-    this.selectedUnit = null;
-
-    (this.units || []).forEach((unit) => {
-      unit.sprite.setInteractive();
-      unit.sprite.on("pointerdown", () => {
-        if (!this.selectedUnit) {
-          if (unit.owner === "Player 1") this.selectedUnit = unit;
-          return;
+      // ========== PLAYERS ==========
+      say("seed players (Supabase guarded)");
+      try {
+        await supabase.from("players").delete().neq("id", 0);
+        // Build AI list before inserting rows
+        for (let i = 1; i < levelData.num_enemies + 1; i++) {
+          const aiName = "AI " + i;
+          this.players.push(aiName);
+          this.AIs.push(new EnemyAI(this, aiName));
         }
-        if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
-          this.combat(this.selectedUnit.id, unit.id);
-          this.selectedUnit = null;
+        await supabase
+          .from("players")
+          .insert(this.players.map((name) => ({ name })));
+      } catch (e) {
+        console.warn("[players] ignoring error:", e);
+      }
+
+      // ========== GRID ==========
+      say("build hex grid");
+      const radius = 30;
+      const hexWidth = Math.sqrt(3) * radius;
+      const hexHeight = 2 * radius;
+
+      const cols = levelData.cols;
+      const rows = levelData.rows;
+
+      const gridPixelWidth = hexWidth * cols + hexWidth / 2;
+      const gridPixelHeight = hexHeight * 0.75 * rows + hexHeight / 4;
+
+      const offsetX = (this.scale.width - gridPixelWidth) / 2;
+      const offsetY = (this.scale.height - gridPixelHeight) / 2;
+
+      const playerColors = {
+        "Player 1": 0x3377cc,
+        "AI 1": 0xd2042d,
+        "AI 2": 0xcc3333,
+      };
+
+      this.tiles = new Map();
+
+      for (const tileData of levelData.tiles) {
+        const { q, r, color } = tileData;
+        const tileColor = parseInt(color);
+        const tile = new Tile(this, q, r, offsetX, offsetY, tileColor);
+
+        for (const [playerName, playerColor] of Object.entries(playerColors)) {
+          if (tileColor === playerColor) {
+            tile.setOwner(playerName);
+            break;
+          }
+        }
+        this.tiles.set(`${q},${r}`, tile);
+
+        // drop zone (safe but not required for drawing)
+        const dz = this.add
+          .zone(tile.x, tile.y, hexWidth * 0.9, hexHeight * 0.9)
+          .setRectangleDropZone(hexWidth * 0.9, hexHeight * 0.9);
+        dz.setData("tileObj", tile);
+      }
+
+      this.input.setTopOnly(true);
+
+      // ========== HUD ==========
+      say("create HUD");
+      this.createTurnHud();
+      this.turnText.setText(`Round: ${this.round}`);
+      this.goldText.setText(`Gold: ${this.playerGold}`);
+
+      // Persistent state (guard Supabase failures so we still render)
+      say("load persisted turn & tiles (guarded)");
+      try {
+        await this.loadTurnState(this.level);
+      } catch (e) {
+        console.warn("loadTurnState", e);
+      }
+      try {
+        await this.loadTiles(this.level);
+      } catch (e) {
+        console.warn("loadTiles", e);
+      }
+
+      // ========== UNIT PROGRESSION PANEL ==========
+      say("build UnitProgression panel");
+      let unitCatalog = [];
+
+      unitCatalog = await (async () => {
+        try {
+          const { data, error } = await supabase
+            .from("units_data")
+            .select("name,tier")
+            .order("tier")
+            .order("name");
+
+          if (error) throw error;
+
+          // Normalize Supabase data
+          const normalized = (data || []).map((u) => {
+            const key = String(u.name || "")
+              .toLowerCase()
+              .trim()
+              .replace(/\s+/g, ""); // convert e.g. "Horse Man" -> "horseman"
+            return {
+              id: key, // used internally
+              name: u.name, // pretty display name
+              tier: u.tier ?? 1,
+              iconKey: key, // must match this.load.image(key, ...)
+            };
+          });
+
+          // ✅ Fallback check: if preload doesn’t have a texture, drop it
+          return normalized.filter((u) => this.textures.exists(u.iconKey));
+        } catch (e) {
+          console.warn("Supabase failed, using fallbackUnits:", e);
+
+          // fallbackUnits is your static array
+          return fallbackUnits.map((u) => {
+            const key = u.id.toLowerCase().trim();
+            return { ...u, id: key, iconKey: key };
+          });
+        }
+      })();
+
+      const fallbackUnits = [
+        { id: "scout", name: "scout", tier: 1 },
+        { id: "slinger", name: "slinger", tier: 1 },
+        { id: "warrior", name: "warrior", tier: 1 },
+        { id: "archer", name: "archer", tier: 2 },
+        { id: "horseman", name: "horseman", tier: 2 },
+        { id: "swordsman", name: "swordsman", tier: 2 },
+        { id: "chariot", name: "chariot", tier: 3 },
+        { id: "knight", name: "knight", tier: 3 },
+        { id: "lancer", name: "lancer", tier: 3 },
+        { id: "musketeer", name: "musketeer", tier: 4 },
+      ];
+
+      // UnitProgression is robust to missing textures now
+      this.unitUI = new UnitProgression(this, {
+        units: unitCatalog.length ? unitCatalog : fallbackUnits,
+        turnsPerTier: 5,
+        onTierUnlock: (tier) => console.log(`Unlocked Tier ${tier}`),
+      });
+
+      // Apply current round to lock/unlock tiers
+      this.unitUI.applyRound(this.round ?? 1);
+
+      // ========== UNITS FROM DB ==========
+      say("load units_state (guarded)");
+      try {
+        await this.loadUnitDataFromDB();
+      } catch (e) {
+        console.warn("loadUnitDataFromDB", e);
+      }
+
+      // Keyboard & interactions
+      this.input.keyboard.on("keydown-SPACE", () => this.advanceTurn());
+
+      this.scale.on("resize", (size) => {
+        const x = size.width - 260;
+        if (this.turnText) this.turnText.setPosition(x, 20);
+        if (this.endTurnBtn) this.endTurnBtn.setPosition(x, 92);
+        if (this.goldText) this.goldText.setPosition(x, 160);
+      });
+
+      this.input.on("gameobjectdown", async (_pointer, obj) => {
+        if (obj.unitId) {
+          const unit = this.units.find((u) => u.id === obj.unitId);
+          if (unit) this.onUnitClick(unit);
         }
       });
-    });
 
-    this.createResetButton();
-    this.createBackButton();
-    this.createSaveLoadButtons();
+      this.selectedUnit = null;
 
-    say('Game ready ✅');
-    // Remove the debug text once we’re sure the scene is running
-    this.time.delayedCall(800, () => dbg.destroy());
-  } catch (err) {
-    console.error('GameScene.create() failed', err);
-    dbg.setText(`Create failed:\n${(err && err.message) || err}`);
-    // Keep text visible so you can see the exception on GitHub Pages.
+      (this.units || []).forEach((unit) => {
+        unit.sprite.setInteractive();
+        unit.sprite.on("pointerdown", () => {
+          if (!this.selectedUnit) {
+            if (unit.owner === "Player 1") this.selectedUnit = unit;
+            return;
+          }
+          if (this.selectedUnit && unit.owner !== this.selectedUnit.owner) {
+            this.combat(this.selectedUnit.id, unit.id);
+            this.selectedUnit = null;
+          }
+        });
+      });
+
+      this.createResetButton();
+      this.createBackButton();
+      this.createSaveLoadButtons();
+
+      say("Game ready ✅");
+      // Remove the debug text once we’re sure the scene is running
+      this.time.delayedCall(800, () => dbg.destroy());
+    } catch (err) {
+      console.error("GameScene.create() failed", err);
+      dbg.setText(`Create failed:\n${(err && err.message) || err}`);
+      // Keep text visible so you can see the exception on GitHub Pages.
+    }
   }
-}
 
   shutdown() {
     this.unitUI?.destroy();
@@ -325,7 +369,9 @@ export class GameScene extends Phaser.Scene {
   checkWinLose() {
     const allTiles = Array.from(this.tiles.values());
     const allPlayer = allTiles.filter((t) => t.owner === "Player 1").length;
-    const allEnemy = allTiles.filter((t) => t.owner && t.owner.startsWith("AI")).length;
+    const allEnemy = allTiles.filter(
+      (t) => t.owner && t.owner.startsWith("AI"),
+    ).length;
 
     if (allEnemy === 0) this.showEndScreen("win");
     else if (allPlayer === 0) this.showEndScreen("lose");
@@ -383,8 +429,8 @@ export class GameScene extends Phaser.Scene {
       const level = this.level;
       await supabase.from("tiles_state").delete().eq("level", level);
       await supabase.from("turn_state").delete().eq("level", level);
-      await supabase.from("units_state").delete();           // optional
-      await supabase.from("players").delete().neq("id", 0);  // optional
+      await supabase.from("units_state").delete(); // optional
+      await supabase.from("players").delete().neq("id", 0); // optional
 
       // Reset local state
       this.round = 1;
@@ -591,7 +637,9 @@ export class GameScene extends Phaser.Scene {
     try {
       const { data, error } = await supabase
         .from("units_state")
-        .select("id, unit_type, current_health, owned_by, q_pos, r_pos, moves_left");
+        .select(
+          "id, unit_type, current_health, owned_by, q_pos, r_pos, moves_left",
+        );
       if (error) throw error;
 
       // clear existing
@@ -599,7 +647,13 @@ export class GameScene extends Phaser.Scene {
       this.units = [];
 
       for (const row of data) {
-        const unit = new this.Unit(this, row.q_pos, row.r_pos, row.unit_type, row.owned_by);
+        const unit = new this.Unit(
+          this,
+          row.q_pos,
+          row.r_pos,
+          row.unit_type,
+          row.owned_by,
+        );
         unit.id_num = row.id;
         unit.id = row.unit_type;
         unit.sprite.unitId = row.id;
@@ -638,7 +692,9 @@ export class GameScene extends Phaser.Scene {
   // (still local endpoints; migrate later if needed)
   async checkUnitRange(attackerId, victimId) {
     try {
-      const res = await fetch(`/detect_units?attackId=${attackerId}&enemyId=${victimId}`);
+      const res = await fetch(
+        `/detect_units?attackId=${attackerId}&enemyId=${victimId}`,
+      );
       return await res.json();
     } catch (error) {
       console.error("Error checking range:", error);
@@ -654,7 +710,10 @@ export class GameScene extends Phaser.Scene {
       if (unit.owner === this.currentPlayer()) return;
       this.targetUnit = unit;
 
-      const inRange = await this.checkUnitRange(this.selectedUnit.id, this.targetUnit.id);
+      const inRange = await this.checkUnitRange(
+        this.selectedUnit.id,
+        this.targetUnit.id,
+      );
       if (inRange) await this.combat(this.selectedUnit.id, this.targetUnit.id);
       this.selectedUnit = null;
       this.targetUnit = null;
@@ -663,7 +722,9 @@ export class GameScene extends Phaser.Scene {
 
   async combat(attackerId, victimId) {
     try {
-      let res = await fetch(`/combat?attackerId=${attackerId}&victimId=${victimId}`);
+      let res = await fetch(
+        `/combat?attackerId=${attackerId}&victimId=${victimId}`,
+      );
       let data = await res.json();
 
       if (data.error) {
@@ -674,7 +735,9 @@ export class GameScene extends Phaser.Scene {
       if (data.victimUpdated && data.victimUpdated.current_health > 0) {
         let victimUnit = this.units.find((u) => u.id === victimId);
         if (victimUnit) {
-          console.log(`Victim ${victimId} now has ${data.victimUpdated.current_health} HP`);
+          console.log(
+            `Victim ${victimId} now has ${data.victimUpdated.current_health} HP`,
+          );
         }
       }
 
@@ -724,7 +787,9 @@ export class GameScene extends Phaser.Scene {
       this.turnIndex = data.turn;
       this.playerGold = data.gold;
     } else {
-      await supabase.from("turn_state").insert({ level, round: 1, turn: 0, gold: this.playerGold });
+      await supabase
+        .from("turn_state")
+        .insert({ level, round: 1, turn: 0, gold: this.playerGold });
     }
   }
 
@@ -768,4 +833,3 @@ export class GameScene extends Phaser.Scene {
     console.log("Tiles loaded.");
   }
 }
-
