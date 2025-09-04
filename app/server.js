@@ -170,27 +170,30 @@ app.put("/set_gold", async (req, res) => {
 
 app.post("/export_table", async (req, res) => {
   const { table, level } = req.body;
-
   try {
+    const result = await pool.query(`SELECT * FROM ${table}`);
     const dir = path.join("/tmp", level);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
     const filePath = path.join(dir, `${table}.csv`);
 
-    const result = await pool.query(`SELECT * FROM ${table}`);
-    const parser = new Parser();
+    // Specify fields to avoid empty data errors
+    let fields = [];
+    if (table === "units_state") {
+      fields = ["id", "unit_type", "q_pos", "r_pos", "moves_left", "owned_by"];
+    } else if (table === "players") {
+      fields = ["id", "name", "gold"];
+    }
+
+    const parser = new Parser({ fields });
     const csv = parser.parse(result.rows);
 
     fs.writeFileSync(filePath, csv);
 
-    res.json({
-      success: true,
-      path: filePath,
-      url: `/tmp/${level}/${table}.csv`,
-    });
-    console.log("CSV saved to:", filePath);
+    console.log(`CSV saved to: ${filePath}`);
+    res.json({ success: true, path: filePath });
   } catch (err) {
-    console.error("Failed to save table:", table, err);
+    console.error(`Failed to save table ${table}:`, err);
     res
       .status(500)
       .json({ error: `Failed to save table ${table}: ${err.message}` });
