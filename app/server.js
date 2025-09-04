@@ -1,7 +1,7 @@
 const pg = require("pg");
 const express = require("express");
 const app = express();
-const port = process.env.PORT || 4000;
+const port = 3000;
 const hostname = "localhost";
 const env = require("../env.json");
 const Pool = pg.Pool;
@@ -10,21 +10,12 @@ const fs = require("fs");
 const path = require("path");
 const { Parser } = require("json2csv");
 const { parse } = require("csv-parse/sync");
-
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
-
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-});
-
 pool.connect().then(function () {
   console.log(`Connected to database ${env.database}`);
 });
-const SelectEntity = require("./selectEntity");
+const SelectEntity = require('./selectEntity');
 const selectEntity = new SelectEntity(pool);
-const Combat = require("./public/combat");
+const Combat = require('./public/combat');
 const combat = new Combat(pool);
 
 app.use(express.static("public"));
@@ -33,13 +24,14 @@ app.use(express.json());
 // Returns all units from units_state
 app.get("/get_all_units", async (req, res) => {
   try {
-    const result = await selectEntity.getAllUnits();
+    const result = await selectEntity.getAllUnits(); 
     res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).send("Error fetching all units.");
   }
 });
+
 
 // get the unit from the units_data table
 app.get("/get_unit", async (req, res) => {
@@ -66,16 +58,14 @@ app.get("/get_unit_state", async (req, res) => {
   }
 });
 
-// for when a new unit is bought
+// for when a new unit is bought 
 app.get("/initiate_unit", async (req, res) => {
   try {
     const unitName = req.query.unitName;
     const q_pos = parseInt(req.query.q_pos);
     const r_pos = parseInt(req.query.r_pos);
     const player = decodeURIComponent(req.query.player);
-    const response = await fetch(
-      `http://localhost:3000/get_unit?unitName=${unitName}`,
-    );
+    const response = await fetch(`http://localhost:3000/get_unit?unitName=${unitName}`);
     const unit = await response.json();
     await selectEntity.initiateUnit(unit, q_pos, r_pos, player);
     res.send();
@@ -93,29 +83,24 @@ app.get("/detect_units", async (req, res) => {
 
     const attackId = req.query.attackId;
     const enemyId = req.query.enemyId;
-
+    
     const attackUnitType = await selectEntity.getUnitType(attackId);
     const attackPos = await selectEntity.getUnitPosition(attackId);
     const range = await selectEntity.getUnitRange(attackUnitType);
     const enemyPos = await selectEntity.getUnitPosition(enemyId);
-
+    
     // bool value
-    const inRange = await combat.check_range(
-      attackPos.q_pos,
-      attackPos.r_pos,
-      range,
-      enemyPos.q_pos,
-      enemyPos.r_pos,
-    ); // change this
-
+    const inRange = await combat.check_range(attackPos.q_pos, attackPos.r_pos, range, enemyPos.q_pos, enemyPos.r_pos); // change this
+   
     res.json(inRange);
   } catch (error) {
     res.status(500).send("Error getting unit.");
   }
+
 });
 
 // called when units are attacking one another
-// this function should get both the attacker and victim and update both units in the table
+// this function should get both the attacker and victim and update both units in the table 
 // only called when the above get function, "get_unit_id" is true
 app.get("/combat", async (req, res) => {
   try {
@@ -124,10 +109,12 @@ app.get("/combat", async (req, res) => {
 
     const result = await combat.attack(attackerId, victimId);
     res.json(result);
+
   } catch (error) {
     console.error(error);
     res.status(500).send("Error in combat.");
   }
+
 });
 
 // adds player to players table
@@ -152,10 +139,7 @@ app.get("/clear_table", async (req, res) => {
 app.get("/get_gold", async (req, res) => {
   try {
     const player = req.query.player;
-    const result = await pool.query(
-      "SELECT gold FROM players WHERE name = $1",
-      [player],
-    );
+    const result = await pool.query("SELECT gold FROM players WHERE name = $1", [player]);
     return res.json(result.rows[0]);
   } catch (error) {
     console.log(error);
@@ -166,10 +150,7 @@ app.get("/get_gold", async (req, res) => {
 app.put("/set_gold", async (req, res) => {
   try {
     const { name, gold } = req.body;
-    await pool.query("UPDATE players SET gold = $1 WHERE name = $2", [
-      gold,
-      name,
-    ]);
+    await pool.query("UPDATE players SET gold = $1 WHERE name = $2", [gold, name]);
     res.send();
   } catch (error) {
     console.log(error);
@@ -209,13 +190,7 @@ app.post("/import_table", async (req, res) => {
   const { table, level } = req.body;
 
   try {
-    const filePath = path.join(
-      __dirname,
-      "public",
-      "saves",
-      level,
-      `${table}.csv`,
-    );
+    const filePath = path.join(__dirname, "public", "saves", level, `${table}.csv`);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: "CSV file not found" });
@@ -231,15 +206,12 @@ app.post("/import_table", async (req, res) => {
     for (const row of rows) {
       const columns = Object.keys(row).join(",");
       const values = Object.values(row)
-        .map((v) => `'${v}'`) // simple quoting; sanitize for production!
+        .map(v => `'${v}'`) // simple quoting; sanitize for production!
         .join(",");
       await pool.query(`INSERT INTO ${table} (${columns}) VALUES (${values})`);
     }
 
-    res.json({
-      success: true,
-      message: `Imported ${rows.length} rows into ${table}`,
-    });
+    res.json({ success: true, message: `Imported ${rows.length} rows into ${table}` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to import CSV into DB" });
@@ -318,15 +290,12 @@ app.get("/update_unit_pos", async (req, res) => {
   const q_pos = req.query.q_pos;
   await selectEntity.updateUnitPos(id, r_pos, q_pos);
   return res.send();
-});
+})
 
 app.get("/get_moves_left", async (req, res) => {
   try {
     const id = req.query.id;
-    const result = await pool.query(
-      "SELECT moves_left FROM units_state WHERE id = $1",
-      [id],
-    );
+    const result = await pool.query("SELECT moves_left FROM units_state WHERE id = $1", [id]);
     return res.json(result.rows[0]);
   } catch (error) {
     console.log(error);
@@ -337,10 +306,7 @@ app.get("/get_moves_left", async (req, res) => {
 app.put("/set_moves_left", async (req, res) => {
   try {
     const { id, moves_left } = req.body;
-    await pool.query("UPDATE units_state SET moves_left = $1 WHERE id = $2", [
-      moves_left,
-      id,
-    ]);
+    await pool.query("UPDATE units_state SET moves_left = $1 WHERE id = $2", [moves_left, id]);
     res.send();
   } catch (error) {
     console.log(error);
@@ -351,14 +317,10 @@ app.put("/set_moves_left", async (req, res) => {
 app.get("/get_unit_id", async (req, res) => {
   const r_pos = req.query.r_pos;
   const q_pos = req.query.q_pos;
-  const unit = await pool.query(
-    `SELECT id FROM units_state WHERE r_pos = $1 AND q_pos = $2`,
-    [r_pos, q_pos],
-  );
+  const unit = await pool.query(`SELECT id FROM units_state WHERE r_pos = $1 AND q_pos = $2`, [r_pos, q_pos]);
   return res.json(unit.rows[0]);
-});
+})
 
 app.listen(port, hostname, () => {
   console.log(`Listening at: http://${hostname}:${port}`);
 });
-
