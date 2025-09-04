@@ -1,18 +1,19 @@
 const pg = require("pg");
 const express = require("express");
 const app = express();
-const port = process.env.PORT || 4000;
-const hostname = "localhost";
-const env = require("../env.json");
+const port = process.env.PORT || 4000; // Render assigns a port
 const Pool = pg.Pool;
+const env = require("../env.json");
 const pool = new Pool(env);
 const fs = require("fs");
 const path = require("path");
 const { Parser } = require("json2csv");
 const { parse } = require("csv-parse/sync");
+
 pool.connect().then(function () {
   console.log(`Connected to database ${env.database}`);
 });
+
 const SelectEntity = require("./selectEntity");
 const selectEntity = new SelectEntity(pool);
 const Combat = require("./public/combat");
@@ -349,6 +350,6 @@ app.get("/get_unit_id", async (req, res) => {
   return res.json(unit.rows[0]);
 });
 
-app.listen(port, hostname, () => {
-  console.log(`Listening at: http://${hostname}:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Server running on port ${port}`);
 });
