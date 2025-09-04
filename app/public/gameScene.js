@@ -86,8 +86,8 @@ export class GameScene extends Phaser.Scene {
     const levelData = this.cache.json.get(this.level);
 
     // Reset players and units_state table
-    await fetch("http://0.0.0.0:10000/clear_table?name=players");
-    await fetch("http://0.0.0.0:10000/clear_table?name=units_state");
+    await fetch("/clear_table?name=players");
+    await fetch("/clear_table?name=units_state");
 
     for (let i = 1; i < levelData.num_enemies + 1; i++) {
       const aiName = "AI " + i;
@@ -97,7 +97,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (let player_name of this.players) {
-      await fetch("http://0.0.0.0:10000/add_player", {
+      await fetch("/add_player", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ player: player_name }),
@@ -279,7 +279,7 @@ export class GameScene extends Phaser.Scene {
       const goldGained = ownedTileCount * 5;
       this.playerGold += goldGained;
 
-      await fetch("http://0.0.0.0:10000/set_gold", {
+      await fetch("/set_gold", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: current, gold: this.playerGold }),
@@ -615,7 +615,7 @@ export class GameScene extends Phaser.Scene {
   // get level from this.level (set in init(data))
   // table: name of table (string)
   saveTable(level, table) {
-    fetch(`http://0.0.0.0:10000/export_table`, {
+    fetch(`/export_table`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ level, table }),
@@ -633,7 +633,7 @@ export class GameScene extends Phaser.Scene {
 
   async importTable(level, table) {
     try {
-      const res = await fetch("http://0.0.0.0:10000/import_table", {
+      const res = await fetch("/import_table", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ level, table }),
@@ -648,7 +648,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   saveTurnState(level) {
-    fetch("http://0.0.0.0:10000/save_turn", {
+    fetch("/save_turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -668,7 +668,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   loadTurnState(level) {
-    return fetch(`http://0.0.0.0:10000/load_turn?level=${level}`)
+    return fetch(`/load_turn?level=${level}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -690,7 +690,7 @@ export class GameScene extends Phaser.Scene {
       owner: tile.owner || null,
     }));
 
-    fetch("http://0.0.0.0:10000/save_tiles", {
+    fetch("/save_tiles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ level, tiles: tilesData }),
@@ -706,7 +706,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   loadTiles(level) {
-    fetch(`http://0.0.0.0:10000/load_tiles?level=${level}`)
+    fetch(`/load_tiles?level=${level}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -732,4 +732,3 @@ export class GameScene extends Phaser.Scene {
       });
   }
 }
-
