@@ -42,6 +42,7 @@ export default class Unit {
   }
 
   async init(name) {
+    console.log(name);
     const res = await fetch(`/get_unit?unitName=${name}`);
     let unit;
     try {

@@ -33,14 +33,16 @@ app.get("/get_all_units", async (req, res) => {
 });
 
 // get the unit from the units_data table
+
 app.get("/get_unit", async (req, res) => {
   try {
     const unitName = req.query.unitName;
     const unit = await selectEntity.getNewUnit(unitName);
+    if (!unit) return res.status(404).json({ error: "Unit not found" });
     res.json(unit);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Error getting unit.");
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" }); // <-- must return JSON
   }
 });
 
