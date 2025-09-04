@@ -353,10 +353,14 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive();
 
-    saveBtn.on("pointerdown", () => {
+    saveBtn.on("pointerdown", async () => {
       const level = this.level;
-      this.saveTable(level, "players");
-      this.saveTable(level, "units_state");
+
+      // Await both tables
+      await this.saveTable(level, "players");
+      await this.saveTable(level, "units_state");
+
+      // Save other things
       this.saveTurnState(level);
       this.saveTiles(level);
     });
@@ -615,18 +619,23 @@ export class GameScene extends Phaser.Scene {
   // get level from this.level (set in init(data))
   // table: name of table (string)
 
-  saveTable(level, table) {
-    fetch("/export_table", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level, table }),
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success) {
-          console.log(`Table saved to temp folder: ${result.path}`);
-        }
+  async saveTable(level, table) {
+    try {
+      const res = await fetch("/export_table", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level, table }),
       });
+      const result = await res.json();
+      if (result.success) {
+        console.log(`Table saved to temp folder: ${result.path}`);
+        return result.path;
+      } else {
+        console.error("Failed to save table:", result.error);
+      }
+    } catch (err) {
+      console.error("Error saving table:", err);
+    }
   }
 
   async importTable(level, table) {
