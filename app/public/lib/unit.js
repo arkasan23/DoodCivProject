@@ -43,7 +43,14 @@ export default class Unit {
 
   async init(name) {
     const res = await fetch(`/get_unit?unitName=${name}`);
-    const unit = await res.json();
+    let unit;
+    try {
+      unit = await res.json();
+    } catch (err) {
+      console.error("Failed to parse unit JSON:", err);
+      return; // stop init if unit data isn't valid
+    }
+
     this.movementRange = unit.move_range;
     this.maxHealth = unit.health;
     //this.health = unit.health;
