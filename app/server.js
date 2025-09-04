@@ -190,8 +190,10 @@ app.post("/export_table", async (req, res) => {
     });
     console.log("CSV saved to:", filePath);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to save table" });
+    console.error("Failed to save table:", table, err);
+    res
+      .status(500)
+      .json({ error: `Failed to save table ${table}: ${err.message}` });
   }
 });
 
