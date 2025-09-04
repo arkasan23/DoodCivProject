@@ -502,7 +502,7 @@ export class GameScene extends Phaser.Scene {
       const unitsData = await res.json();
 
       // Clear any existing units first
-      this.units.forEach((unit) => unit.sprite.destroy());
+      this.units.forEach((unit) => unit.destroy());
       this.units = [];
 
       for (let unitData of unitsData) {
