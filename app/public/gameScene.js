@@ -614,8 +614,9 @@ export class GameScene extends Phaser.Scene {
 
   // get level from this.level (set in init(data))
   // table: name of table (string)
+
   saveTable(level, table) {
-    fetch(`/export_table`, {
+    fetch("/export_table", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ level, table }),
@@ -623,12 +624,9 @@ export class GameScene extends Phaser.Scene {
       .then((res) => res.json())
       .then((result) => {
         if (result.success) {
-          console.log(`Table saved successfully: ${result.url}`);
-        } else {
-          console.error("Failed to save table:", result.error);
+          console.log(`Table saved to temp folder: ${result.path}`);
         }
-      })
-      .catch((err) => console.error("Error saving table:", err));
+      });
   }
 
   async importTable(level, table) {
