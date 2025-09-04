@@ -42,7 +42,7 @@ export default class Unit {
   }
 
   async init(name) {
-    const res = await fetch(`http://localhost:3000/get_unit?unitName=${name}`);
+    const res = await fetch(`/get_unit?unitName=${name}`);
     const unit = await res.json();
     this.movementRange = unit.move_range;
     this.maxHealth = unit.health;
@@ -52,9 +52,9 @@ export default class Unit {
     this.attackRange = unit.attack_range;
     this.movesLeft = this.movementRange;
     await fetch(
-      `http://localhost:3000/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`,
+      `/initiate_unit?unitName=${name}&q_pos=${this.q}&r_pos=${this.r}&player=${this.owner}`,
     );
-    const data = await fetch(`http://localhost:3000/get_unit_id?q_pos=${this.q}&r_pos=${this.r}`);
+    const data = await fetch(`/get_unit_id?q_pos=${this.q}&r_pos=${this.r}`);
     const { id } = await data.json();
     this.id_num = id;
   }
@@ -87,7 +87,7 @@ export default class Unit {
       this.highlightReachableTiles();
     });
 
-    this.sprite.on("drag", async(_pointer, dragX, dragY) => {
+    this.sprite.on("drag", async (_pointer, dragX, dragY) => {
       if (this.movesLeft <= 0) return;
       if (this.owner !== "Player 1") return;
 
@@ -147,7 +147,9 @@ export default class Unit {
         this.resetPosition();
         this.moveToTile(tile);
         console.log("ID: " + this.id_num);
-        await fetch(`http://localhost:3000/update_unit_pos?id=${this.id_num}&r_pos=${this.r}&q_pos=${this.q}`); // Update unit position in units_state
+        await fetch(
+          `/update_unit_pos?id=${this.id_num}&r_pos=${this.r}&q_pos=${this.q}`,
+        ); // Update unit position in units_state
         this.movesLeft--;
         //this.moved = true;
         this.updateMovesLeft();
@@ -427,10 +429,10 @@ export default class Unit {
   }
 
   async updateMovesLeft() {
-    await fetch("http://localhost:3000/set_moves_left", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: this.id_num, moves_left: this.movesLeft }),
-        });
+    await fetch("/set_moves_left", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: this.id_num, moves_left: this.movesLeft }),
+    });
   }
 }

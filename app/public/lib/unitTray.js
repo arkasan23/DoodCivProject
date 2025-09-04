@@ -34,9 +34,7 @@ export default class UnitTray {
   async fetchCost() {
     const unitType = this.id || this.textureKey;
     try {
-      const response = await fetch(
-        `http://localhost:3000/get_unit?unitName=${unitType}`,
-      );
+      const response = await fetch(`/get_unit?unitName=${unitType}`);
       const data = await response.json();
       this.cost = data.cost;
 
@@ -125,10 +123,13 @@ export default class UnitTray {
 
         this.scene.playerGold -= this.cost;
 
-        await fetch("http://localhost:3000/set_gold", {
+        await fetch("/set_gold", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Player 1", gold: this.scene.playerGold }),
+          body: JSON.stringify({
+            name: "Player 1",
+            gold: this.scene.playerGold,
+          }),
         });
 
         console.log(
