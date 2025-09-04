@@ -314,7 +314,7 @@ export class GameScene extends Phaser.Scene {
 
     backBtn.on("pointerdown", () => {
       // Clean up units and UI
-      this.units.forEach((unit) => unit.sprite?.destroy());
+      this.units.forEach((unit) => unit.destroy());
       this.units = [];
 
       this.unitUI?.destroy();
@@ -611,7 +611,7 @@ export class GameScene extends Phaser.Scene {
       if (data.victimDefeated) {
         let victimIndex = this.units.findIndex((unit) => unit.id === victimId);
         if (victimIndex !== -1) {
-          this.units[victimIndex].sprite.destroy();
+          this.units[victimIndex].destroy();
           this.units.splice(victimIndex, 1);
         }
       }
