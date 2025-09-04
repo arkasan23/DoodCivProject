@@ -64,9 +64,7 @@ app.get("/initiate_unit", async (req, res) => {
     const q_pos = parseInt(req.query.q_pos);
     const r_pos = parseInt(req.query.r_pos);
     const player = decodeURIComponent(req.query.player);
-    const response = await fetch(
-      `http://localhost:3000/get_unit?unitName=${unitName}`,
-    );
+    const response = await fetch(`/get_unit?unitName=${unitName}`);
     const unit = await response.json();
     await selectEntity.initiateUnit(unit, q_pos, r_pos, player);
     res.send();
