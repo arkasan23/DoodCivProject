@@ -506,6 +506,7 @@ export class GameScene extends Phaser.Scene {
       this.units = [];
 
       for (let unitData of unitsData) {
+        console.log(unitData);
         const unit = new this.Unit(
           this,
           unitData.q_pos,
