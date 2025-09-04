@@ -58,19 +58,23 @@ app.get("/get_unit_state", async (req, res) => {
 });
 
 // for when a new unit is bought
+
 app.get("/initiate_unit", async (req, res) => {
   try {
     const unitName = req.query.unitName;
     const q_pos = parseInt(req.query.q_pos);
     const r_pos = parseInt(req.query.r_pos);
     const player = decodeURIComponent(req.query.player);
-    const response = await fetch(`/get_unit?unitName=${unitName}`);
-    const unit = await response.json();
+
+    const unit = await selectEntity.getNewUnit(unitName); // direct DB query
     await selectEntity.initiateUnit(unit, q_pos, r_pos, player);
-    res.send();
+
+    res.json({ success: true, unitName, q_pos, r_pos, player });
   } catch (error) {
     console.error(error);
-    res.status(500).send("Error initiating unit.");
+    res
+      .status(500)
+      .json({ error: "Error initiating unit", details: error.message });
   }
 });
 
