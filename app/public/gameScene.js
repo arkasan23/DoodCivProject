@@ -513,10 +513,13 @@ export class GameScene extends Phaser.Scene {
           unitData.r_pos,
           unitData.unit_type,
           unitData.owned_by,
+          unitData.unit_type,
         );
+        /*
         unit.id_num = unitData.id;
         unit.id = unitData.unit_type;
         unit.sprite.unitId = unitData.id;
+        */
         unit.movesLeft = unitData.moves_left;
 
         const tile = this.tiles.get(`${unit.q_pos},${unit.r_pos}`);
