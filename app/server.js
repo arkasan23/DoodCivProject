@@ -191,6 +191,10 @@ app.post("/export_table", async (req, res) => {
     fs.writeFileSync(filePath, csv);
 
     console.log(`CSV saved to: ${filePath}`);
+
+    console.log(`Exporting table ${table}, rows found:`, result.rows.length);
+    console.log(result.rows);
+
     res.json({ success: true, path: filePath });
   } catch (err) {
     console.error(`Failed to save table ${table}:`, err);
